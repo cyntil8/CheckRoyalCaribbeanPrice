@@ -8,14 +8,12 @@ import re
 import base64
 import json
 
-cruiseLineName = "royalcaribbean"
-cruiseLineCode = "R"
 appKey = "hyNNqIPHHzaLzVpcICPdAdbFV8yvTsAm"
+cruiselines = []
+cruiselines.append({"lineName": "royalcaribbean", "lineCode": "R", "linePretty": "Royal Caribbean"})
+cruiselines.append({"lineName": "celebritycruises", "lineCode": "C", "linePretty": "Celebrity"})
 
 def main():
-    global cruiseLineName
-    global cruiseLineCode
-
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     print(timestamp)
     
@@ -34,28 +32,26 @@ def main():
             print("Apprise Notification Sent...quitting")
             quit()
 
-        if 'cruiseLineName' in data and data['cruiseLineName']:
-            cruiseLineName = data['cruiseLineName']
-        if 'cruiseLineCode' in data and data['cruiseLineCode']:
-            cruiseLineCode = data['cruiseLineCode']              
-
         if 'accountInfo' in data:
             for accountInfo in data['accountInfo']:
                 username = accountInfo['username']
                 password = accountInfo['password']
                 print(username)
                 session = requests.session()
-                access_token,accountId,session = login(username,password,session)
-                getVoyages(access_token,accountId,session,apobj)
+                for cruiseline in cruiselines:
+                    access_token,accountId,session = login(username,password,session,cruiseline['lineName'])
+                    getVoyages(access_token,accountId,session,apobj,cruiseline['lineCode'],cruiseline['linePretty'])
     
         if 'cruises' in data:
-            for cruises in data['cruises']:
-                if cruiseLineName in cruises['cruiseURL']: # Only get X cruises if Celebrity, RCCL if Royal Caribbean
+            for cruiseline in cruiselines:
+                print("Checking prices for your " + cruiseline['linePretty'] + " cruises")
+                for cruises in data['cruises']:
                     cruiseURL = cruises['cruiseURL'] 
-                    paidPrice = float(cruises['paidPrice'])
-                    get_cruise_price(cruiseURL, paidPrice, apobj)
+                    if cruiseline['lineName'] in cruiseURL:
+                        paidPrice = float(cruises['paidPrice'])
+                        get_cruise_price(cruiseURL, paidPrice, apobj, cruiseline['lineName'])
             
-def login(username,password,session):
+def login(username,password,session, cruiseLineName):
     headers = {
         'Content-Type': 'application/x-www-form-urlencoded',
         'Authorization': 'Basic ZzlTMDIzdDc0NDczWlVrOTA5Rk42OEYwYjRONjdQU09oOTJvMDR2TDBCUjY1MzdwSTJ5Mmg5NE02QmJVN0Q2SjpXNjY4NDZrUFF2MTc1MDk3NW9vZEg1TTh6QzZUYTdtMzBrSDJRNzhsMldtVTUwRkNncXBQMTN3NzczNzdrN0lC',
@@ -104,17 +100,16 @@ def getNewBeveragePrice(access_token,accountId,session,reservationId,ship,startD
     if not currentPrice:
         currentPrice = response.json().get("payload").get("startingFromPrice").get("adultShipboardPrice")
     
+    text = reservationId + ": " + title + " - Paid price: {:0,.2f}".format(paidPrice) + " Current price: {:0,.2f}".format(currentPrice)
     if currentPrice < paidPrice:
-        text = reservationId + ": Rebook! " + title + " Price is lower: " + str(currentPrice) + " than " + str(paidPrice)
-        print(text)
-        apobj.notify(body=text, title='Cruise Addon Price Alert')
+        text += " - DOWN {:0,.2f}".format(paidPrice - currentPrice)
+    elif currentPrice > paidPrice:
+        text += " - UP {:0,.2f}".format(currentPrice - paidPrice)
     else:
-        print(reservationId + ": " + "You have the best price for " + title +  " of: " + str(paidPrice))
-        
-    if currentPrice > paidPrice:
-        print(reservationId + ": \t " + "Price of " + title + " is now higher: " + str(currentPrice))
+        text += " - unchanged"
+    print(text)
 
-def getVoyages(access_token,accountId,session,apobj):
+def getVoyages(access_token,accountId,session,apobj,cruiseLineCode,cruiseLinePretty):
 
     headers = {
         'Access-Token': access_token,
@@ -226,7 +221,7 @@ def getOrders(access_token,accountId,session,reservationId,passengerId,ship,star
                    
                 getNewBeveragePrice(access_token,accountId,session,reservationId,ship,startDate,prefix,paidPrice,product,apobj)
 
-def get_cruise_price(url, paidPrice, apobj):
+def get_cruise_price(url, paidPrice, apobj, cruiseLineName):
 
     headers = {
         'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
@@ -243,33 +238,14 @@ def get_cruise_price(url, paidPrice, apobj):
         'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36',
     }
 
-    # clean url of r0y and r0x tags
-    findindex1=url.find("r0y")
-    findindex2=url.find("&",findindex1+1)
-    if findindex2==-1:
-        url=url[0:findindex1-1]
-    else:
-        url=url[0:findindex1-1]+url[findindex2:len(url)]
-    
-    findindex1=url.find("r0x")
-    findindex2=url.find("&",findindex1+1)
-    if findindex2==-1:
-        url=url[0:findindex1-1]
-    else:
-        url=url[0:findindex1-1]+url[findindex2:len(url)]
-        
-    
     parsed_url = urlparse(url)
     params = parse_qs(parsed_url.query)
-    
+    params.pop('r0y', None)
+    params.pop('r0x', None)
+
     response = requests.get('https://www.'+cruiseLineName+'.com/checkout/guest-info', params=params,headers=headers)
     
-    preString = params.get("sailDate")[0] + " " + params.get("shipCode")[0]+ " " + params.get("cabinClassType")[0] + " " + params.get("r0f")[0]
-    
-    roomNumberList = params.get("r0j")
-    if roomNumberList:
-        roomNumber = roomNumberList[0]
-        preString = preString + " Cabin " + roomNumber
+    preString = params.get("sailDate")[0] + " " + params.get("shipCode")[0]+ " " + params.get("r0d")[0] + " " + params.get("r0f")[0]
     
     soup = BeautifulSoup(response.text, "html.parser")
     soupFind = soup.find("span",attrs={"class":"SummaryPrice_title__1nizh9x5","data-testid":"pricing-total"})
@@ -280,7 +256,7 @@ def get_cruise_price(url, paidPrice, apobj):
             textString = preString + ": URL Not Working - Redirecting to suggested room"
             print(textString)
             newURL = "https://www." + cruiseLineName + ".com" + redirectString
-            get_cruise_price(newURL, paidPrice, apobj)
+            get_cruise_price(newURL, paidPrice, apobj, cruiseLineName)
             print("Update url to: " + newURL)
             return
         else:
@@ -293,16 +269,18 @@ def get_cruise_price(url, paidPrice, apobj):
     priceString = priceString.replace(",", "")
     m = re.search("\\$(.*)USD", priceString)
     priceOnlyString = m.group(1)
-    price = float(priceOnlyString)
+    currentPrice = float(priceOnlyString)
     
-    if price < paidPrice: 
-        textString = "Rebook! " + preString + " New Price of "  + str(price) + " is lower than " + str(paidPrice)
-        print(textString)
+    textString = preString + ": Saved Price {:0,.2f}".format(paidPrice) + " Current Price {:0,.2f}".format(currentPrice)
+    if currentPrice < paidPrice: 
+        textString += " - DOWN {:0,.2f}".format(paidPrice - currentPrice)
         apobj.notify(body=textString, title='Cruise Price Alert')
+    elif currentPrice > paidPrice:
+        textString += " - UP {:0,.2f}".format(currentPrice - paidPrice)
     else:
-        print(preString + ": You have best Price of " + str(paidPrice) )
-        if price > paidPrice:
-            print("\t Current Price is higher: " + str(price) )
+        textString += " - unchanged"
+
+    print(textString)
 
 if __name__ == "__main__":
     main()
