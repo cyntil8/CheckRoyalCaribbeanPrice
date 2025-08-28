@@ -135,7 +135,6 @@ def getProducts(access_token,accountId,session,reservationId,passengerId,ship,st
     if os.path.isfile(wbName):
         workbook = openpyxl.load_workbook(wbName)
         for sheetname in workbook.sheetnames:
-            print("Sheetname", sheetname)
             if "Chart - " in sheetname or sheetname == "Sheet":
                 continue
             break
