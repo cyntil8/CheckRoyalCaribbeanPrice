@@ -134,7 +134,12 @@ def getProducts(access_token,accountId,session,reservationId,passengerId,ship,st
 
     if os.path.isfile(wbName):
         workbook = openpyxl.load_workbook(wbName)
-        lastSheet = workbook.active
+        for sheetname in workbook.sheetnames:
+            print("Sheetname", sheetname)
+            if "Chart - " in sheetname or sheetname == "Sheet":
+                continue
+            break
+        lastSheet = workbook[sheetname]
         for i in range(1, lastSheet.max_row+1):
             compPrice.append({"key": lastSheet.cell(row=i, column=1).value + '|' + lastSheet.cell(row=i, column=2).value, "msrp": lastSheet.cell(row=i, column=3).value, "price": lastSheet.cell(row=i, column=4).value})
     else:
