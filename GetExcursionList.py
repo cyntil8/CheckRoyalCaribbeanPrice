@@ -157,18 +157,19 @@ def getProducts(access_token,accountId,session,reservationId,passengerId,ship,st
     sheet = workbook.active
     currow = 2 # Header is row 1
 
-    sheet.append(["Date", "Time", "Duration", "Day", "Port", "Title", "Price", "Description", "Link"])
+    sheet.append(["Link", "Day", "Title", "Port", "Time", "Duration", "Price", "Promotion", "Description" ])
     for cell in sheet["1:1"]:
         cell.style = "Headline 1"
-    sheet.column_dimensions['A'].width = 12
-    sheet.column_dimensions['B'].width = 9
-    sheet.column_dimensions['C'].width = 10
-    sheet.column_dimensions['D'].width = 10
-    sheet.column_dimensions['E'].width = 27
-    sheet.column_dimensions['F'].width = 53
+    sheet.column_dimensions['A'].width = 7
+    sheet.column_dimensions['B'].width = 10
+    sheet.column_dimensions['C'].width = 53
+    sheet.column_dimensions['D'].width = 27
+    sheet.column_dimensions['E'].width = 9
+    sheet.column_dimensions['F'].width = 10
     sheet.column_dimensions['G'].width = 11
-    sheet.column_dimensions['H'].width = 60
-    sheet.column_dimensions['I'].width = 7
+    sheet.column_dimensions['H'].width = 24
+    sheet.column_dimensions['I'].width = 60
+
     for excursion in response.json().get("payload").get("products"):
         getURL = 'https://aws-prd.api.rccl.com//en/celebrity/web/commerce-api/catalog/v2/'+ship+'/categories/pt_shoreX/products/'+excursion["id"]+'?reservationId='+reservationId+'&passengerId='+passengerId+'&startDate='+startDate+'&currencyIso=USD'
 
@@ -185,22 +186,25 @@ def getProducts(access_token,accountId,session,reservationId,passengerId,ship,st
                 duration = ""
                 if detail.json().get("payload").get("durationValues") is not None:
                     duration = detail.json().get("payload").get("durationValues")[0]
-                sheet.append([offering["dateTime"], offering["dateTime"], duration, offering["dayOfCruise"], offering["portLocation"], excursion["title"], excursion["lowestAdultPrice"], detail.json().get("payload").get("detail").replace('<p>', '').replace('</p>',''), ""])
+                if excursion["promoDescription"] and excursion["promoDescription"]["displayName"]:
+                    displayName = excursion["promoDescription"]["displayName"]
+                elif excursion["promoDescription"] and excursion["promoDescription"]["title"]:
+                    displayName = excursion["promoDescription"]["title"]
+                else:
+                    displayName = "None"
+                sheet.append(["", offering["dayOfCruise"], excursion["title"], offering["portLocation"], offering["dateTime"], duration, excursion["lowestAdultPrice"], displayName, detail.json().get("payload").get("detail").replace('<p>', '').replace('</p>','')])
                 link = "https://www.celebritycruises.com/account/cruise-planner/category/pt_shoreX/product/"+excursion["id"]+"?bookingId="+reservationId+"&shipCode="+ship+"&sailDate="+startDate
+                sheet.cell(row=currow, column=1).value = excursion["id"]
+                sheet.cell(row=currow, column=1).hyperlink = link
+                sheet.cell(row=currow, column=1).style = "Hyperlink"
                 if offering["dateTime"] is not None:
                     offer_date = datetime.strptime(offering["dateTime"], '%Y-%m-%dT%H:%M:%S')
-                    sheet.cell(row=currow, column=1).value = offer_date
-                    sheet.cell(row=currow, column=1).number_format = 'mm/dd/yyyy'
-                    sheet.cell(row=currow, column=2).value = offer_date
-                    sheet.cell(row=currow, column=2).number_format = 'h:mm AM/PM'
+                    sheet.cell(row=currow, column=5).value = offer_date
+                    sheet.cell(row=currow, column=5).number_format = 'h:mm AM/PM'
                 else:
-                    sheet.cell(row=currow, column=1).value = "Entire cruise"
-                    sheet.cell(row=currow, column=2).value = ""
+                    sheet.cell(row=currow, column=5).value = ""
                 sheet.cell(row=currow, column=7).number_format = '"$"#,##0.00'
-                sheet.cell(row=currow, column=8).alignment = Alignment(wrap_text=True)
-                sheet.cell(row=currow, column=9).value = excursion["id"]
-                sheet.cell(row=currow, column=9).hyperlink = link
-                sheet.cell(row=currow, column=9).style = "Hyperlink"
+                sheet.cell(row=currow, column=9).alignment = Alignment(wrap_text=True)
                 currow += 1
 
     sheet.freeze_panes = 'A2'
