@@ -205,3 +205,18 @@ If any of the prices are lower, it will send a notification if you set up appris
 1. Prices of internet, beverage packages, and "The Key" are per day, this code divides by the length of your cruise. If you buy a partial package, this logic may not work correctly.
 1. If other prices are per day, it will not work. Let me know if other daily purchases are not calculating correctly.
 1. Please double check that the price is lower before you rebook! I am not responsible if you book at a higher price!
+
+# Spreadsheet scripts
+There are four standalone python scripts to do various things and save the results to spreadsheets. Requires config.yaml as explained above for account login information and which cruises to track. 
+
+## CheckCruisePrice.py
+This script is very similar to CheckRoyalCaribbeanPrice.py, except it stores the prices in a spreadsheet (price_history.xlsx) and creates a little graph. It does not report on product prices, as that is in GetProducts.py
+
+## GetExcursions.py
+This script uses account information in config.yaml to login to the Royal Caribbean/Celebrity API and get all the excursions for the cruise. It writes them to a spreadsheet with the name R|C-[booking]-shorex.xlsx. Each row contains a link to view/book the excursion on the Royal Caribbean or Celebrity site. This script writes the spreadsheet each day, so there is no history of excursion prices. If run with a booking parameter, it only builds a spreadsheet for that booking, otherwise, it finds all Royal Caribbean and Celebrity bookings for the account. Example: python GetExcursionList.py -b=123456
+
+## GetProducts.py
+This script uses account information in config.yaml to login to the Royal Caribbean/Celebrity API and get all of the products for the cruise. It then writes them to a spreadsheet with the name R|C-[booking]-products. It also prints the prices of any products you have booked. This script opens the exisiting spreadsheet and adds a new tab with the product prices each time you run it, so you have a history or product prices. If run with a booking parameter, it only builds a spreadsheet for that booking, otherwise, it finds all Royal Caribbean and Celebrity bookings for the account. Example: python GetProducts.py -b=123456
+
+## ChartProductHistory.py
+This script uses only the spreadsheet created by GetProducts.py to create a chart of the prices of a specific item. It adds or updates a tab with the product requested. It requires two parameters, spreadsheet file name and product name. Example: python ChartProductHistory.py -f="R-123456-products.xlsx" -p="Deluxe Beverage Package"

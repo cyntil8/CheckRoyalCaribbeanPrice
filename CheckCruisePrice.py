@@ -31,46 +31,14 @@ def main():
     with open('config.yaml', 'r') as file:
         data = yaml.safe_load(file)
         
-        if 'accountInfo' in data:
-            for accountInfo in data['accountInfo']:
-                username = accountInfo['username']
-                password = accountInfo['password']
-                print(username)
-                session = requests.session()
-                if 'cruises' in data:
-                    for cruiseline in cruiselines:
-                        access_token,accountId,session = login(username, password, session, cruiseline['lineName'])
-                        print("Checking prices for your " + cruiseline['linePretty'] + " cruises")
-                        for cruises in data['cruises']:
-                            if cruiseline['lineName'] in cruises['cruiseURL']:
-                                compPrice = float(cruises['paidPrice'])
-                                get_cruise_price(timestamp, cruises['cruiseURL'], compPrice, cruiseline['lineName'])
+        if 'cruises' in data:
+            for cruiseline in cruiselines:
+                print("Checking prices for your " + cruiseline['linePretty'] + " cruises")
+                for cruises in data['cruises']:
+                    if cruiseline['lineName'] in cruises['cruiseURL']:
+                        compPrice = float(cruises['paidPrice'])
+                        get_cruise_price(timestamp, cruises['cruiseURL'], compPrice, cruiseline['lineName'])
             
-def login(username, password, session, cruiseLineName):
-
-    headers = {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Authorization': 'Basic ZzlTMDIzdDc0NDczWlVrOTA5Rk42OEYwYjRONjdQU09oOTJvMDR2TDBCUjY1MzdwSTJ5Mmg5NE02QmJVN0Q2SjpXNjY4NDZrUFF2MTc1MDk3NW9vZEg1TTh6QzZUYTdtMzBrSDJRNzhsMldtVTUwRkNncXBQMTN3NzczNzdrN0lC',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:136.0) Gecko/20100101 Firefox/136.0',
-    }
-    
-    data = 'grant_type=password&username=' + username +  '&password=' + password + '&scope=openid+profile+email+vdsid'
-    
-    response = session.post('https://www.'+cruiseLineName+'.com/auth/oauth2/access_token', headers=headers, data=data)
-    
-    if response.status_code != 200:
-        print(cruiseLineName + " Website Might Be Down. Quitting")
-        quit()
-          
-    access_token = response.json().get("access_token")
-    
-    list_of_strings = access_token.split(".")
-    string1 = list_of_strings[1]
-    decoded_bytes = base64.b64decode(string1 + '==')
-    auth_info = json.loads(decoded_bytes.decode('utf-8'))
-    accountId = auth_info["sub"]
-    return access_token,accountId,session
-
 def get_cruise_price(timestamp, url, compPrice, cruiseLineName):
 
     headers = {
