@@ -105,11 +105,11 @@ def get_cruise_price(timestamp, url, compPrice, cruiseLineName):
         shipDate = params.get("sailDate")[0][5:7] + "/" + params.get("sailDate")[0][8:10] + "/" + params.get("sailDate")[0][:4]
     group = shipDate + " " + shipName + ", " + roomType
 
-    textString = preString + ": Saved Price {:0,.2f}".format(compPrice) + " Current Price {:0,.2f}".format(currentPrice)
+    textString = preString + ": Saved Price ${:0,.2f}".format(compPrice) + " Current Price ${:0,.2f}".format(currentPrice)
     if currentPrice < compPrice: 
-        textString += " - DOWN {:0,.2f}".format(compPrice - currentPrice)
+        textString += " - DOWN ${:0,.2f}".format(compPrice - currentPrice)
     elif currentPrice > compPrice:
-        textString += " - UP {:0,.2f}".format(currentPrice - compPrice)
+        textString += " - UP ${:0,.2f}".format(currentPrice - compPrice)
     else:
         textString += " - unchanged"
 

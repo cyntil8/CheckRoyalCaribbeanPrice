@@ -22,6 +22,10 @@ RESET = '\033[0m' # Resets color to default
 
 dateDisplayFormat = "%x"  # Uses the locale date format unless overridden by config
 
+cruiselines = []
+cruiselines.append({"lineName": "royalcaribbean", "lineCode": "R", "linePretty": "Royal Caribbean"})
+cruiselines.append({"lineName": "celebritycruises", "lineCode": "C", "linePretty": "Celebrity"})
+
 def main():
     parser = argparse.ArgumentParser(description="Check Royal Caribbean Price")
     parser.add_argument('-c', '--config', type=str, default='config.yaml', help='Path to configuration YAML file (default: config.yaml)')
@@ -60,19 +64,12 @@ def main():
             for accountInfo in data['accountInfo']:
                 username = accountInfo['username']
                 password = accountInfo['password']
-                if 'cruiseLine' in accountInfo:
-                   if accountInfo['cruiseLine'].lower().startswith("c"):
-                    cruiseLineName = "celebritycruises"
-                   else:
-                    cruiseLineName =  "royalcaribbean"
-                else:
-                   cruiseLineName =  "royalcaribbean"     
-                    
-                print(cruiseLineName + " " + username)
-                session = requests.session()
-                access_token,accountId,session = login(username,password,session,cruiseLineName)
-                getLoyalty(access_token,accountId,session)
-                getVoyages(access_token,accountId,session,apobj,cruiseLineName,reservationFriendlyNames)
+                for cruiseline in cruiselines:
+                    print(cruiseline['linePretty'] + " " + username)
+                    session = requests.session()
+                    access_token,accountId,session = login(username,password,session,cruiseline['lineName'])
+                    getLoyalty(access_token,accountId,session,cruiseline['lineCode'])
+                    getVoyages(access_token,accountId,session,apobj,cruiseline['lineCode'],reservationFriendlyNames)
     
         if 'cruises' in data:
             for cruises in data['cruises']:
@@ -143,7 +140,7 @@ def getNewBeveragePrice(access_token,accountId,session,reservationId,ship,startD
         currentPrice = newPricePayload.get("adultShipboardPrice")
     
     if currentPrice < paidPrice:
-        text = passengerName + ": Rebook! " + title + " Price is lower: " + str(currentPrice) + " than " + str(paidPrice)
+        text = passengerName + ": Rebook! " + title + " Price is lower: ${:0,.2f} than ${:0,.2f}".format(currentPrice, paidPrice)
         text += '\n' + 'Cancel Order ' + orderDate + ' ' + orderCode + ' at https://www.royalcaribbean.com/account/cruise-planner/order-history?bookingId=' + reservationId + '&shipCode=' + ship + "&sailDate=" + startDate
         
         if not owner:
@@ -152,14 +149,14 @@ def getNewBeveragePrice(access_token,accountId,session,reservationId,ship,startD
         print(RED + text + RESET)
         apobj.notify(body=text, title='Cruise Addon Price Alert')
     else:
-        tempString = GREEN + passengerName.ljust(10) + " (" + room + ") has best price for " + title +  " of: " + str(paidPrice) + RESET
+        tempString = GREEN + passengerName.ljust(10) + " (" + room + ") has best price for " + title +  " of: ${:0,.2f}" .format(paidPrice) + RESET
         if currentPrice > paidPrice:
-            tempString += " (now " + str(currentPrice) + ")"
+            tempString += " (now ${:0,.2f})".format(currentPrice)
         print(tempString)
         
     
 
-def getLoyalty(access_token,accountId,session):
+def getLoyalty(access_token,accountId,session,cruiselineCode):
 
     headers = {
         'Access-Token': access_token,
@@ -168,13 +165,31 @@ def getLoyalty(access_token,accountId,session):
     }
     response = session.get('https://aws-prd.api.rccl.com/en/royal/web/v1/guestAccounts/loyalty/info', headers=headers)
     loyalty = response.json().get("payload").get("loyaltyInformation")
-    cAndANumber = loyalty.get("crownAndAnchorId")
-    cAndALevel = loyalty.get("crownAndAnchorSocietyLoyaltyTier")
-    cAndAPoints = loyalty.get("crownAndAnchorSocietyLoyaltyIndividualPoints")
-    print("C&A: " + str(cAndANumber) + " " + cAndALevel + " " + str(cAndAPoints) + " Points")  
-    
-    
-def getVoyages(access_token,accountId,session,apobj,cruiseLineName,reservationFriendlyNames):
+    if cruiselineCode == 'R': 
+        loyaltyNumber = loyalty.get("crownAndAnchorId")
+        loyaltyLevel = loyalty.get("crownAndAnchorLoyaltyMatchTier")
+        loyaltyPoints = loyalty.get("crownAndAnchorSocietyLoyaltyRelationshipPoints")
+        loyaltyNextTier = loyalty.get("crownAndAnchorSocietyNextTier")
+        loyaltyNextNeed = loyalty.get("crownAndAnchorSocietyRemainingPoints")
+        print("Crown and Anchor: {} {} {:,} points. {:,} points to {}".format(loyaltyNumber, loyaltyLevel, loyaltyPoints, loyaltyNextNeed, loyaltyNextTier))
+        if loyalty.get("clubRoyaleLoyaltyTier") and loyalty.get("clubRoyaleLoyaltyTier") != "BLANK":
+            loyaltyLevel = loyalty.get("clubRoyaleLoyaltyTier")
+            loyaltyPoints = loyalty.get("clubRoyaleLoyaltyRelationshipPoints")
+            print("Club Royale: {} {:,} points".format(loyaltyLevel, loyaltyPoints))
+    elif cruiselineCode == 'C':
+        loyaltyNumber = loyalty.get("captainsClubId")
+        loyaltyLevel = loyalty.get("captainsClubLoyaltyMatchTier")
+        loyaltyPoints = loyalty.get("captainsClubLoyaltyRelationshipPoints")
+        loyaltyNextTier = loyalty.get("captainsClubNextTier")
+        loyaltyNextNeed = loyalty.get("captainsClubRemainingPoints")
+        print("Captain's Club: {} {} {:,} points. {:,} points to {}".format(loyaltyNumber, loyaltyLevel, loyaltyPoints, loyaltyNextNeed, loyaltyNextTier))
+        if loyalty.get("celebrityBlueChipLoyaltyTier") and loyalty.get("celebrityBlueChipLoyaltyTier") != "BLANK":
+            loyaltyLevel = loyalty.get("celebrityBlueChipLoyaltyTier")
+            loyaltyPoints = loyalty.get("celebrityBlueChipLoyaltyRelationshipPoints")
+            print("Blue Chip Club: {} {:,} points".format(loyaltyLevel, loyaltyPoints))
+    print()
+
+def getVoyages(access_token,accountId,session,apobj,brandCode,reservationFriendlyNames):
 
     headers = {
         'Access-Token': access_token,
@@ -182,11 +197,6 @@ def getVoyages(access_token,accountId,session,apobj,cruiseLineName,reservationFr
         'vds-id': accountId,
     }
     
-    if cruiseLineName == "royalcaribbean":
-        brandCode = "R"
-    else:
-        brandCode = "C"
-        
     params = {
         'brand': brandCode,
         'includeCheckin': 'false',
@@ -221,7 +231,7 @@ def getVoyages(access_token,accountId,session,apobj,cruiseLineName,reservationFr
         sailDateDisplay = datetime.strptime(sailDate, "%Y%m%d").strftime(dateDisplayFormat)
         print(reservationDisplay + ": " + sailDateDisplay + " " + shipCode + " Room " + booking.get("stateroomNumber") + " (" + passengerNames + ")")
         if booking.get("balanceDue") is True:
-            print(YELLOW + reservationDisplay + ": " + "Remaining Cruise Payment Balance is $" + str(booking.get("balanceDueAmount")) + RESET)
+            print(YELLOW + reservationDisplay + ": " + "Remaining Cruise Payment Balance is ${:0,.2f}".format(booking.get("balanceDueAmount")) + RESET)
 
         getOrders(access_token,accountId,session,reservationId,passengerId,shipCode,sailDate,numberOfNights,apobj)
         print(" ")
@@ -283,9 +293,8 @@ def getOrders(access_token,accountId,session,reservationId,passengerId,ship,star
                 if paidPrice == 0:
                     continue
                 # These packages report total price, must divide by number of days
-                if prefix == "pt_beverage" or prefix == "pt_internet" or order_title == "The Key":
-                      if not order_title.startswith("Evian") and not order_title.startswith("Specialty Coffee"):
-                          paidPrice = round(paidPrice / numberOfNights,2)
+                if orderDetail.get("productSummary").get("salesUnit") in [ 'PER_NIGHT', 'PER_DAY' ]:
+                    paidPrice = round(paidPrice / numberOfNights,2)
                 #print(orderDetail)
                 
                 guests = orderDetail.get("guests")
@@ -321,28 +330,15 @@ def get_cruise_price(url, paidPrice, apobj):
         'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36',
     }
 
-    # clean url of r0y and r0x tags
-    findindex1=url.find("r0y")
-    findindex2=url.find("&",findindex1+1)
-    if findindex2==-1:
-        url=url[0:findindex1-1]
-    else:
-        url=url[0:findindex1-1]+url[findindex2:len(url)]
-    
-    findindex1=url.find("r0x")
-    findindex2=url.find("&",findindex1+1)
-    if findindex2==-1:
-        url=url[0:findindex1-1]
-    else:
-        url=url[0:findindex1-1]+url[findindex2:len(url)]
-        
-    
-    
     m = re.search('www.(.*).com', url)
     cruiseLineName = m.group(1)
+
+   # clean url of r0y and r0x tags
     parsed_url = urlparse(url)
     params = parse_qs(parsed_url.query)
-    
+    params.pop('r0y', None)
+    params.pop('r0x', None)
+
     response = requests.get('https://www.'+cruiseLineName+'.com/checkout/guest-info', params=params,headers=headers)
     
     sailDate = params.get("sailDate")[0]
@@ -381,13 +377,13 @@ def get_cruise_price(url, paidPrice, apobj):
     price = float(priceOnlyString)
     
     if price < paidPrice: 
-        textString = "Rebook! " + preString + " New price of "  + str(price) + " is lower than " + str(paidPrice)
+        textString = "Rebook! " + preString + " New price of ${:0,.2f} is lower than ${:0,.2f}".format(price, paidPrice)
         print(RED + textString + RESET)
         apobj.notify(body=textString, title='Cruise Price Alert')
     else:
-        tempString = GREEN + preString + ": You have best price of " + str(paidPrice) + RESET
+        tempString = GREEN + preString + ": You have best price of ${:0,.2f}".format(paidPrice) + RESET
         if price > paidPrice:
-            tempString += " (now " + str(price) + ")"
+            tempString += " (now ${:0,.2f})".format(price)
             print(tempString)
 
 # Unused Functions
