@@ -13,7 +13,7 @@ import argparse
 
 appKey = "qpRMO6lj4smwkT1sWlSdIj7b8QF5rG8Q"
 cruiselines = []
-cruiselines.append({"lineName": "royalcaribbean", "lineCode": "R", "linePretty": "Royal Caribbean", "productList": ["beverage","dining","internet","onboardactivities","photoPackage","gifts"]})
+cruiselines.append({"lineName": "royalcaribbean", "lineCode": "R", "linePretty": "Royal Caribbean", "productList": ["beverage","dining","internet","onboardactivities","photoPackage","gifts","key","packages","cococay","royalbeachclub","arcade","spa"]})
 cruiselines.append({"lineName": "celebritycruises", "lineCode": "C", "linePretty": "Celebrity", "productList": ["drinks","food","packages","shipexcursions","roomdelivery","spa","wifi","exclusiveexperiences","giftsandextras","preandpost","photoPackage","fitness","programming"]})
 
 def main():
@@ -135,7 +135,7 @@ def getProducts(access_token,accountId,session,reservationId,passengerId,ship,st
     if os.path.isfile(wbName):
         workbook = openpyxl.load_workbook(wbName)
         for sheetname in workbook.sheetnames:
-            if "Chart - " in sheetname or sheetname == "Sheet":
+            if "Chart " in sheetname or sheetname == "Sheet":
                 continue
             break
         lastSheet = workbook[sheetname]

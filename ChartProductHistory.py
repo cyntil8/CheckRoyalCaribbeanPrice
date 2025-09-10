@@ -12,7 +12,7 @@ def build_chart_from_description(filename, description):
     max_amt = None
     
     for sheetname in wb.sheetnames:
-        if "Chart - " in sheetname or sheetname == "Sheet":
+        if "Chart " in sheetname or sheetname == "Sheet":
             continue
         sheet = wb[sheetname]
         date = datetime.strptime(sheetname, "%Y-%m-%d (%H %M)")
@@ -30,7 +30,7 @@ def build_chart_from_description(filename, description):
         print("Minimum price", "${:0,.2f}".format(min_amt), "Maximum price", "${:0,.2f}".format(max_amt))
         results.sort(key=lambda x: x[0])
 
-        chart_sheet_name = "Chart - " + description
+        chart_sheet_name = "Chart " + description[:24]
         if chart_sheet_name in wb.sheetnames:
             chart_sheet = wb[chart_sheet_name]
             wb.remove(chart_sheet)
@@ -41,7 +41,7 @@ def build_chart_from_description(filename, description):
             chart_sheet.append([date, amount])
 
         chart = BarChart()
-        chart.title = f"Results for '{description}'"
+        chart.title = description
         chart.x_axis.title = "Date"
         chart.legend.position = "b"
         chart.y_axis.title = "Amount"
