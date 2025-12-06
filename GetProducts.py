@@ -288,9 +288,9 @@ def getOrders(access_token,accountId,session,reservationId,passengerId,ship,star
                 # These packages report total price, must divide by number of days
                 if orderDetail.get("productSummary").get("salesUnit") in [ 'PER_NIGHT', 'PER_DAY' ]:
                    paidPrice = round(paidPrice / numberOfNights,2)
-                getCurrentPrice(access_token,accountId,session,reservationId,ship,startDate,prefix,paidPrice,product,currencyCode)
+                getCurrentPrice(access_token,accountId,session,reservationId,passengerId,ship,startDate,prefix,paidPrice,product,currencyCode)
 
-def getCurrentPrice(access_token,accountId,session,reservationId,ship,startDate,prefix,paidPrice,product,currencyCode):    
+def getCurrentPrice(access_token,accountId,session,reservationId,passengerId,ship,startDate,prefix,paidPrice,product,currencyCode):    
     
     headers = {
         'Access-Token': access_token,
@@ -301,6 +301,7 @@ def getCurrentPrice(access_token,accountId,session,reservationId,ship,startDate,
     params = {
         'reservationId': reservationId,
         'startDate': startDate,
+        'passengerId': passengerId,
         'currencyIso': currencyCode,
     }
 
