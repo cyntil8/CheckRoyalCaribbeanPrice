@@ -81,7 +81,7 @@ def get_cruise_price(timestamp, url, compPrice, cruiseLineName):
             textString = preString + " No Longer Available To Book"
             print(textString)
             return
-    
+
     priceString = soupFind.text
     priceString = priceString.replace(",", "")
     m = re.search("\\$(.*)USD", priceString)
@@ -201,7 +201,7 @@ def get_cruise_price(timestamp, url, compPrice, cruiseLineName):
     chart.set_categories(categories)
     chart.legend.position = "b"
 
-    sheet.add_chart(chart, "A" + str(sheet.max_row + 3))
+    sheet.add_chart(chart, get_column_letter(sheet.max_column + 2) + "2")
 
     workbook.save(wbName)
     workbook.close()

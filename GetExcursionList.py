@@ -33,15 +33,19 @@ def main():
     with open('config.yaml', 'r') as file:
         data = yaml.safe_load(file)
         
+        currencyCode = 'USD'
+        if 'currency' in data:
+            currencyCode = data['currency']
+
         if 'accountInfo' in data:
             for accountInfo in data['accountInfo']:
                 username = accountInfo['username']
                 password = accountInfo['password']
-                print(username)
+                print(username, "Currency:", currencyCode) 
                 session = requests.session()
                 for cruiseline in cruiselines:
                     access_token,accountId,session = login(username,password,session,cruiseline['lineName'])
-                    getVoyages(bookingID, access_token,accountId,session,cruiseline['lineCode'])
+                    getVoyages(bookingID, access_token,accountId,session,cruiseline['lineCode'],currencyCode)
             
 def login(username,password,session,cruiseLineName):
     headers = {
@@ -67,7 +71,7 @@ def login(username,password,session,cruiseLineName):
     accountId = auth_info["sub"]
     return access_token,accountId,session
 
-def getVoyages(bookingID,access_token,accountId,session,cruiseLineCode):
+def getVoyages(bookingID,access_token,accountId,session,cruiseLineCode,currencyCode):
 
     headers = {
         'Access-Token': access_token,
@@ -94,9 +98,9 @@ def getVoyages(bookingID,access_token,accountId,session,cruiseLineCode):
         sailDate = booking.get("sailDate")
         numberOfNights = booking.get("numberOfNights")
         shipCode = booking.get("shipCode")
-        getProducts(access_token,accountId,session,reservationId,passengerId,shipCode,sailDate,cruiseLineCode)
+        getProducts(access_token,accountId,session,reservationId,passengerId,shipCode,sailDate,cruiseLineCode,currencyCode)
         
-def getProducts(access_token,accountId,session,reservationId,passengerId,ship,startDate,cruiseLineCode):
+def getProducts(access_token,accountId,session,reservationId,passengerId,ship,startDate,cruiseLineCode,currencyCode):
 
     headers = {
         'Host': 'aws-prd.api.rccl.com',
@@ -130,7 +134,7 @@ def getProducts(access_token,accountId,session,reservationId,passengerId,ship,st
     }
 
     response = session.post(
-        'https://aws-prd.api.rccl.com/en/celebrity/web/commerce-api/catalog/v2/'+ship+'/categories/shorex/products?reservationId='+reservationId+'&passengerId='+passengerId+'&startDate='+startDate+'&currentPage=0&pageSize=1&currencyIso=USD&regionCode=EUROP',
+        'https://aws-prd.api.rccl.com/en/celebrity/web/commerce-api/catalog/v2/'+ship+'/categories/shorex/products?reservationId='+reservationId+'&passengerId='+passengerId+'&startDate='+startDate+'&currentPage=0&pageSize=1&currencyIso='+currencyCode+'&regionCode=EUROP',
         headers=headers,
         data=json.dumps(data)
     )
@@ -143,7 +147,7 @@ def getProducts(access_token,accountId,session,reservationId,passengerId,ship,st
     # Make sure we have all the excursions
     num = response.json().get("payload").get("page").get("totalResults")
     response = session.post(
-        'https://aws-prd.api.rccl.com/en/celebrity/web/commerce-api/catalog/v2/'+ship+'/categories/shorex/products?reservationId='+reservationId+'&passengerId='+passengerId+'&startDate='+startDate+'&currentPage=0&pageSize='+str(num)+'&currencyIso=USD&regionCode=EUROP',
+        'https://aws-prd.api.rccl.com/en/celebrity/web/commerce-api/catalog/v2/'+ship+'/categories/shorex/products?reservationId='+reservationId+'&passengerId='+passengerId+'&startDate='+startDate+'&currentPage=0&pageSize='+str(num)+'&currencyIso='+currencyCode+'&regionCode=EUROP',
         headers=headers,
         data=json.dumps(data)
     )
@@ -171,7 +175,7 @@ def getProducts(access_token,accountId,session,reservationId,passengerId,ship,st
     sheet.column_dimensions['I'].width = 60
 
     for excursion in response.json().get("payload").get("products"):
-        getURL = 'https://aws-prd.api.rccl.com//en/celebrity/web/commerce-api/catalog/v2/'+ship+'/categories/pt_shoreX/products/'+excursion["id"]+'?reservationId='+reservationId+'&passengerId='+passengerId+'&startDate='+startDate+'&currencyIso=USD'
+        getURL = 'https://aws-prd.api.rccl.com//en/celebrity/web/commerce-api/catalog/v2/'+ship+'/categories/pt_shoreX/products/'+excursion["id"]+'?reservationId='+reservationId+'&passengerId='+passengerId+'&startDate='+startDate+'&currencyIso='+currencyCode
 
         detail = session.get(getURL, headers=headers)
 
@@ -204,11 +208,13 @@ def getProducts(access_token,accountId,session,reservationId,passengerId,ship,st
                 else:
                     sheet.cell(row=currow, column=5).value = ""
                 sheet.cell(row=currow, column=7).number_format = '"$"#,##0.00'
-                sheet.cell(row=currow, column=9).alignment = Alignment(wrap_text=True)
+                for col in range(1, sheet.max_column+1):
+                    sheet.cell(row=currow, column=col).alignment = Alignment(vertical='top')
+                sheet.cell(row=currow, column=9).alignment = Alignment(wrap_text=True,vertical='top')
                 currow += 1
 
     sheet.freeze_panes = 'A2'
-    workbook.save(cruiseLineCode+"-"+reservationId+"-shorex.xlsx")
+    workbook.save(cruiseLineCode+"-"+reservationId+"-shorex-"+currencyCode+".xlsx")
 
 if __name__ == "__main__":
     main()

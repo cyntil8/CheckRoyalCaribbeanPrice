@@ -31,15 +31,19 @@ def main():
     with open('config.yaml', 'r') as file:
         data = yaml.safe_load(file)
         
+        currencyCode = 'USD'
+        if 'currency' in data:
+            currencyCode = data['currency']
+
         if 'accountInfo' in data:
             for accountInfo in data['accountInfo']:
                 username = accountInfo['username']
                 password = accountInfo['password']
-                print(username)
+                print(username, "Currency:", currencyCode) 
                 session = requests.session()
                 for cruiseline in cruiselines:
                     access_token,accountId,session = login(username,password,session,cruiseline['lineName'])
-                    getVoyages(bookingID, access_token,accountId,session,cruiseline['lineCode'],cruiseline['productList'])
+                    getVoyages(bookingID, access_token,accountId,session,cruiseline['lineCode'],cruiseline['productList'],currencyCode)
             
 def login(username,password,session,cruiseLineName):
     headers = {
@@ -65,7 +69,7 @@ def login(username,password,session,cruiseLineName):
     accountId = auth_info["sub"]
     return access_token,accountId,session
 
-def getVoyages(bookingID,access_token,accountId,session,cruiseLineCode,productList):
+def getVoyages(bookingID,access_token,accountId,session,cruiseLineCode,productList,currencyCode):
 
     headers = {
         'Access-Token': access_token,
@@ -92,10 +96,10 @@ def getVoyages(bookingID,access_token,accountId,session,cruiseLineCode,productLi
         sailDate = booking.get("sailDate")
         numberOfNights = booking.get("numberOfNights")
         shipCode = booking.get("shipCode")
-        getProducts(access_token,accountId,session,reservationId,passengerId,shipCode,sailDate,cruiseLineCode,productList)
-        getOrders(access_token,accountId,session,reservationId,passengerId,shipCode,sailDate,numberOfNights)
+        getProducts(access_token,accountId,session,reservationId,passengerId,shipCode,sailDate,cruiseLineCode,productList,currencyCode)
+        getOrders(access_token,accountId,session,reservationId,passengerId,shipCode,sailDate,numberOfNights,currencyCode)
         
-def getProducts(access_token,accountId,session,reservationId,passengerId,ship,startDate,cruiseLineCode,productList):
+def getProducts(access_token,accountId,session,reservationId,passengerId,ship,startDate,cruiseLineCode,productList,currencyCode):
 
     headers = {
         'Host': 'aws-prd.api.rccl.com',
@@ -128,7 +132,7 @@ def getProducts(access_token,accountId,session,reservationId,passengerId,ship,st
         "filterFacets": None
     }
 
-    wbName = cruiseLineCode + "-" + reservationId + "-products.xlsx"
+    wbName = cruiseLineCode + "-" + reservationId + "-products-"+currencyCode+".xlsx"
     shName = str(datetime.now().strftime("%Y-%m-%d (%H %M)"))
     compPrice = [] # Array to compare prices to the previous value
 
@@ -164,7 +168,7 @@ def getProducts(access_token,accountId,session,reservationId,passengerId,ship,st
 
         initialPageSize = 50
 
-        postURL = 'https://aws-prd.api.rccl.com/en/celebrity/web/commerce-api/catalog/v2/'+ship+'/categories/'+product+'/products?reservationId='+reservationId+'&passengerId='+passengerId+'&startDate='+startDate+'&currentPage=0&pageSize='+str(initialPageSize)+'&currencyIso=USD&regionCode=EUROP'
+        postURL = 'https://aws-prd.api.rccl.com/en/celebrity/web/commerce-api/catalog/v2/'+ship+'/categories/'+product+'/products?reservationId='+reservationId+'&passengerId='+passengerId+'&startDate='+startDate+'&currentPage=0&pageSize='+str(initialPageSize)+'&currencyIso='+currencyCode+'&regionCode=EUROP'
 
         response = session.post(
             postURL,
@@ -183,7 +187,7 @@ def getProducts(access_token,accountId,session,reservationId,passengerId,ship,st
         num = response.json().get("payload").get("page").get("totalResults")
         if num > initialPageSize:
             response = session.post(
-                'https://aws-prd.api.rccl.com/en/celebrity/web/commerce-api/catalog/v2/'+ship+'/categories/'+product+'/products?reservationId='+reservationId+'&passengerId='+passengerId+'&startDate='+startDate+'&currentPage=0&pageSize='+str(num)+'&currencyIso=USD&regionCode=EUROP',
+                'https://aws-prd.api.rccl.com/en/celebrity/web/commerce-api/catalog/v2/'+ship+'/categories/'+product+'/products?reservationId='+reservationId+'&passengerId='+passengerId+'&startDate='+startDate+'&currentPage=0&pageSize='+str(num)+'&currencyIso='+currencyCode+'&regionCode=EUROP',
                 headers=headers,
                 data=json.dumps(data)
             )
@@ -199,7 +203,7 @@ def getProducts(access_token,accountId,session,reservationId,passengerId,ship,st
 
         if response.json().get("payload").get("products"):
             for item in response.json().get("payload").get("products"):
-                if item["stock"]["stockLevelStatus"] != "inStock" or item["title"] is None:
+                if item["stock"]["stockLevelStatus"] != "inStock" or item["title"] is None or item["lowestAdultPrice"] is None:
                     continue
                 if item["promoDescription"] and item["promoDescription"]["displayName"]:
                     displayName = item["promoDescription"]["displayName"]
@@ -213,7 +217,11 @@ def getProducts(access_token,accountId,session,reservationId,passengerId,ship,st
                     discountedValue = item["promoDescription"]["discountedValue"]
                 else:
                     discountedValue = 0
-                sheet.append([category, item["title"], item["msrpAdultPrice"], item["lowestAdultPrice"], item["unit"]["name"], displayName, promotionValue, discountedValue])
+                if item["unit"] and item["unit"]["name"]:
+                    displayUnit = item["unit"]["name"]
+                else:
+                    displayUnit = "None"
+                sheet.append([category, item["title"], item["msrpAdultPrice"], item["lowestAdultPrice"], displayUnit, displayName, promotionValue, discountedValue])
                 sheet.cell(row=currow, column=3).number_format = '"$"#,##0.00'
                 sheet.cell(row=currow, column=4).number_format = '"$"#,##0.00'
                 sheet.cell(row=currow, column=7).number_format = FORMAT_PERCENTAGE
@@ -230,10 +238,10 @@ def getProducts(access_token,accountId,session,reservationId,passengerId,ship,st
                 currow += 1
 
     sheet.freeze_panes = 'A2'
-    workbook.save(cruiseLineCode + "-" + reservationId + "-products.xlsx")
+    workbook.save(wbName)
     workbook.close()
 
-def getOrders(access_token,accountId,session,reservationId,passengerId,ship,startDate,numberOfNights):
+def getOrders(access_token,accountId,session,reservationId,passengerId,ship,startDate,numberOfNights,currencyCode):
     
     headers = {
         'Access-Token': access_token,
@@ -245,7 +253,7 @@ def getOrders(access_token,accountId,session,reservationId,passengerId,ship,star
         'passengerId': passengerId,
         'reservationId': reservationId,
         'sailingId': ship + startDate,
-        'currencyIso': 'USD',
+        'currencyIso': currencyCode,
         'includeMedia': 'false',
     }
     
@@ -280,9 +288,9 @@ def getOrders(access_token,accountId,session,reservationId,passengerId,ship,star
                 # These packages report total price, must divide by number of days
                 if orderDetail.get("productSummary").get("salesUnit") in [ 'PER_NIGHT', 'PER_DAY' ]:
                    paidPrice = round(paidPrice / numberOfNights,2)
-                getCurrentPrice(access_token,accountId,session,reservationId,ship,startDate,prefix,paidPrice,product)
+                getCurrentPrice(access_token,accountId,session,reservationId,ship,startDate,prefix,paidPrice,product,currencyCode)
 
-def getCurrentPrice(access_token,accountId,session,reservationId,ship,startDate,prefix,paidPrice,product):    
+def getCurrentPrice(access_token,accountId,session,reservationId,ship,startDate,prefix,paidPrice,product,currencyCode):    
     
     headers = {
         'Access-Token': access_token,
@@ -293,7 +301,7 @@ def getCurrentPrice(access_token,accountId,session,reservationId,ship,startDate,
     params = {
         'reservationId': reservationId,
         'startDate': startDate,
-        'currencyIso': 'USD',
+        'currencyIso': currencyCode,
     }
 
     response = session.get(
@@ -303,17 +311,25 @@ def getCurrentPrice(access_token,accountId,session,reservationId,ship,startDate,
     )
     
     title = response.json().get("payload").get("title")
-    currentPrice = response.json().get("payload").get("startingFromPrice").get("adultPromotionalPrice")
-    if not currentPrice:
-        currentPrice = response.json().get("payload").get("startingFromPrice").get("adultShipboardPrice")
+    currentPrice = None
+    try:
+        currentPrice = response.json().get("payload").get("startingFromPrice").get("adultPromotionalPrice")
+        if not currentPrice:
+            currentPrice = response.json().get("payload").get("startingFromPrice").get("adultShipboardPrice")
+    except:
+        pass
     
-    text = reservationId + ": " + title + " - Paid price: {:0,.2f}".format(paidPrice) + " Current price: {:0,.2f}".format(currentPrice)
-    if currentPrice < paidPrice:
-        text += " - DOWN {:0,.2f}".format(paidPrice - currentPrice)
-    elif currentPrice > paidPrice:
-        text += " - UP {:0,.2f}".format(currentPrice - paidPrice)
+    if currentPrice:
+        text = reservationId + ": " + title + " - Paid price: {:0,.2f}".format(paidPrice) + " Current price: {:0,.2f}".format(currentPrice)
+        if currentPrice < paidPrice:
+            text += " - DOWN {:0,.2f}".format(paidPrice - currentPrice)
+        elif currentPrice > paidPrice:
+            text += " - UP {:0,.2f}".format(currentPrice - paidPrice)
+        else:
+            text += " - unchanged"
     else:
-        text += " - unchanged"
+        text = reservationId + ": " + title + " - Paid price: {:0,.2f}".format(paidPrice) + " Current price not available"
+
     print(text)
 
 if __name__ == "__main__":

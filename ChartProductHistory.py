@@ -10,6 +10,8 @@ def build_chart_from_description(filename, description):
     results = []
     min_amt = None
     max_amt = None
+    prev_amt = 0
+    prev_cnt = 0
     
     for sheetname in wb.sheetnames:
         if "Chart " in sheetname or sheetname == "Sheet":
@@ -20,6 +22,11 @@ def build_chart_from_description(filename, description):
             desc = row[1]
             amount = row[3]
             if desc and description.lower() in str(desc).lower():
+                if prev_amt is None:
+                    prev_amt = amount
+                if amount != prev_amt:
+                    prev_amt = amount
+                    prev_cnt += 1
                 if max_amt is None or amount > max_amt:
                     max_amt = amount
                 if min_amt is None or amount < min_amt:
@@ -27,7 +34,7 @@ def build_chart_from_description(filename, description):
                 results.append((date, amount))
 
     if results:
-        print("Minimum price", "${:0,.2f}".format(min_amt), "Maximum price", "${:0,.2f}".format(max_amt))
+        print("Minimum price", "${:0,.2f}".format(min_amt), "Maximum price", "${:0,.2f}".format(max_amt),"Price changes", str(prev_cnt))
         results.sort(key=lambda x: x[0])
 
         chart_sheet_name = "Chart " + description[:24]
