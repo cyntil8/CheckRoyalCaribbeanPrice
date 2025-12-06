@@ -8,8 +8,11 @@ import re
 import base64
 import json
 import argparse
+import locale
 
 appKey = "hyNNqIPHHzaLzVpcICPdAdbFV8yvTsAm"
+
+currencyOverride = ""
 
 foundItems = []
 
@@ -32,20 +35,21 @@ def main():
     args = parser.parse_args()
     config_path = args.config
 
+    # Set Time with AM/PM or 24h based on locale    
+    locale.setlocale(locale.LC_TIME,'')
     timestamp = datetime.now()
     print(" ")
     
     apobj = Apprise()
         
-
     with open(config_path, 'r') as file:
         data = yaml.safe_load(file)
         if 'dateDisplayFormat' in data:
             global dateDisplayFormat
             dateDisplayFormat = data['dateDisplayFormat']
-
+        
         print(timestamp.strftime(dateDisplayFormat + " %X"))
-
+        
         if 'apprise' in data:
             for apprise in data['apprise']:
                 url = apprise['url']
@@ -59,6 +63,14 @@ def main():
         reservationFriendlyNames = {}
         if 'reservationFriendlyNames' in data:
             reservationFriendlyNames=data.get('reservationFriendlyNames', {})
+
+        if 'currencyOverride' in data:
+            global currencyOverride
+            currencyOverride = data['currencyOverride']
+            print(YELLOW + "Overriding Current Price Currency to " + currencyOverride + RESET)
+
+        global shipDictionary
+        shipDictionary = getShipDictionary()
         
         if 'accountInfo' in data:
             for accountInfo in data['accountInfo']:
@@ -102,38 +114,127 @@ def login(username,password,session,cruiseLineName):
     accountId = auth_info["sub"]
     return access_token,accountId,session
 
-def getNewBeveragePrice(access_token,accountId,session,reservationId,ship,startDate,prefix,paidPrice,product,apobj, passengerId,passengerName,room, orderCode, orderDate, owner):
+
+def getInCartPricePrice(access_token,accountId,session,reservationId,ship,startDate,prefix,quantity,paidPrice,currency,product,apobj, guest, passengerId,passengerName,room, orderCode, orderDate, owner):
+        
+    headers = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:145.0) Gecko/20100101 Firefox/145.0',
+    'Accept': 'application/json',
+    'Accept-Language': 'en-US,en;q=0.5',
+    'X-Requested-With': 'XMLHttpRequest',
+    'Access-Token': access_token,
+    'AppKey': appKey,
+    'vds-id': accountId,
+    'Account-Id': accountId,
+    'channel': 'web',
+    'Req-App-Id': 'Royal.Web.PlanMyCruise',
+    'Req-App-Vers': '1.81.3',
+    'Content-Type': 'application/json',
+    'Origin': 'https://www.royalcaribbean.com',
+    'DNT': '1',
+    'Sec-GPC': '1',
+    'Connection': 'keep-alive',
+    'Referer': 'https://www.royalcaribbean.com/',
+    'Sec-Fetch-Dest': 'empty',
+    'Sec-Fetch-Mode': 'cors',
+    'Sec-Fetch-Site': 'cross-site',
+    'Priority': 'u=0',
+    # Requests doesn't support trailers
+    # 'TE': 'trailers',
+    }
+
+    params = {
+        'sailingId': ship + startDate,
+        'currencyIso': currency,
+        'categoryId': prefix,
+    }
+
+    
+    json_data = {
+        'productCode': product,
+        'quantity': quantity,
+        'signOnReservationId': reservationId,
+        'signOnPassengerId': passengerId,
+        'guests': [
+            {
+                'id': passengerId,
+                'firstName': guest.get("firstName"),
+                'lastName': guest.get("lastName"),
+                'selected': False,
+                'dob': guest.get("dob"),
+                'reservationId': reservationId,
+                'attachedToReservation': False,
+            },
+        ],
+        'offeringId': product,
+    }
+
+    response = requests.post(
+        'https://aws-prd.api.rccl.com/en/royal/web/commerce-api/cart/v1/price',
+        params=params,
+        headers=headers,
+        json=json_data,
+    )
+    
+    payload = response.json().get("payload")
+    #print('response')
+    if payload is None:
+        print("Payload Not Returned")
+        return
+        
+    unitType = payload.get("prices")[0].get("unitType")
+    
+    if unitType in [ 'perNight', 'perDay' ]:
+        price = payload.get("prices")[0].get("promoDailyPrice")
+    else:
+        price = payload.get("prices")[0].get("promoPrice")
+        
+    print("Paid Price: " + str(paidPrice) + " Cart Price: " + str(price))
+    
+def getNewBeveragePrice(access_token,accountId,session,reservationId,ship,startDate,prefix,paidPrice,currency,product,apobj, passengerId,passengerName,room, orderCode, orderDate, owner):
     
     headers = {
         'Access-Token': access_token,
         'AppKey': appKey,
         'vds-id': accountId,
     }
-
+    
+    if currencyOverride != "":
+        currency = currencyOverride
+    
     params = {
         'reservationId': reservationId,
         'startDate': startDate,
-        'currencyIso': 'USD',
+        'currencyIso': currency,
         'passengerId': passengerId,
     }
-
+    
     response = session.get(
         'https://aws-prd.api.rccl.com/en/royal/web/commerce-api/catalog/v2/' + ship + '/categories/' + prefix + '/products/' + str(product),
         params=params,
         headers=headers,
     )
     
-    if response.json().get("payload") is None:
+    payload = response.json().get("payload")
+    if payload is None:
         return
-        
-    title = response.json().get("payload").get("title")
     
+    title = payload.get("title")    
+    variant = ""
     try:
-        newPricePayload = response.json().get("payload").get("startingFromPrice")
+        variant = payload.get("baseOptions")[0].get("selected").get("variantOptionQualifiers")[0].get("value")
     except:
-        print(title + " is No Longer For Sale")
+        pass
+    
+    if "Bottles" in variant:
+        title = title + " (" + variant + ")"
+    
+    newPricePayload = payload.get("startingFromPrice")
+    
+    if newPricePayload is None:
+        tempString = YELLOW + passengerName.ljust(10) + " (" + room + ") has best price for " + title +  " of: " + str(paidPrice) + " (No Longer for Sale)" + RESET
+        print(tempString)
         return
-        
         
     currentPrice = newPricePayload.get("adultPromotionalPrice")
     
@@ -141,7 +242,13 @@ def getNewBeveragePrice(access_token,accountId,session,reservationId,ship,startD
         currentPrice = newPricePayload.get("adultShipboardPrice")
     
     if currentPrice < paidPrice:
-        text = passengerName + ": Rebook! " + title + " Price is lower: ${:0,.2f} than ${:0,.2f}".format(currentPrice, paidPrice)
+        text = passengerName + ": Rebook! " + title + " Price is lower: " + str(currentPrice) + " than " + str(paidPrice)
+        
+        promoDescription = payload.get("promoDescription")
+        if promoDescription:
+            promotionTitle = promoDescription.get("displayName")
+            text += '\n Promotion:' + promotionTitle
+            
         text += '\n' + 'Cancel Order ' + orderDate + ' ' + orderCode + ' at https://www.royalcaribbean.com/account/cruise-planner/order-history?bookingId=' + reservationId + '&shipCode=' + ship + "&sailDate=" + startDate
         
         if not owner:
@@ -165,6 +272,7 @@ def getLoyalty(access_token,accountId,session,cruiselineCode):
         'account-id': accountId,
     }
     response = session.get('https://aws-prd.api.rccl.com/en/royal/web/v1/guestAccounts/loyalty/info', headers=headers)
+
     loyalty = response.json().get("payload").get("loyaltyInformation")
     if cruiselineCode == 'R': 
         loyaltyNumber = loyalty.get("crownAndAnchorId")
@@ -230,7 +338,7 @@ def getVoyages(access_token,accountId,session,apobj,brandCode,reservationFriendl
         if str(reservationId) in reservationFriendlyNames:
             reservationDisplay += " (" + reservationFriendlyNames.get(str(reservationId)) + ")"
         sailDateDisplay = datetime.strptime(sailDate, "%Y%m%d").strftime(dateDisplayFormat)
-        print(reservationDisplay + ": " + sailDateDisplay + " " + shipCode + " Room " + booking.get("stateroomNumber") + " (" + passengerNames + ")")
+        print(reservationDisplay + ": " + sailDateDisplay + " " + shipDictionary[shipCode] + " Room " + booking.get("stateroomNumber") + " (" + passengerNames + ")")
         if booking.get("balanceDue") is True:
             print(YELLOW + reservationDisplay + ": " + "Remaining Cruise Payment Balance is ${:0,.2f}".format(booking.get("balanceDueAmount")) + RESET)
 
@@ -247,11 +355,16 @@ def getOrders(access_token,accountId,session,reservationId,passengerId,ship,star
         'Account-Id': accountId,
     }
     
+    if currencyOverride != "":
+        currency = currencyOverride
+    else:
+        currency = "USD"
+          
     params = {
         'passengerId': passengerId,
         'reservationId': reservationId,
         'sailingId': ship + startDate,
-        'currencyIso': 'USD',
+        'currencyIso': currency,
         'includeMedia': 'false',
     }
     
@@ -279,16 +392,17 @@ def getOrders(access_token,accountId,session,reservationId,passengerId,ship,star
                 params=params,
                 headers=headers,
             )
-                    
+            
             for orderDetail in response.json().get("payload").get("orderHistoryDetailItems"):
-                # check for cancelled status at item-level
-                if orderDetail.get("guests")[0].get("orderStatus") == "CANCELLED":
-                    continue
-                    
+                # check for canceled status at item-level
+                
+                quantity = orderDetail.get("priceDetails").get("quantity")
                 order_title = orderDetail.get("productSummary").get("title")
+                
                 product = orderDetail.get("productSummary").get("id")
                 prefix = orderDetail.get("productSummary").get("productTypeCategory").get("id")
-                if prefix == "pt_internet":
+                
+                if prefix == "pt_internet" or prefix == "pt_beverage":
                     product = orderDetail.get("productSummary").get("baseId")
                 paidPrice = orderDetail.get("guests")[0].get("priceDetails").get("subtotal")
                 if paidPrice == 0:
@@ -299,10 +413,18 @@ def getOrders(access_token,accountId,session,reservationId,passengerId,ship,star
                 #print(orderDetail)
                 
                 guests = orderDetail.get("guests")
-                #pretty_json_string = json.dumps(guests, indent=4)
-                #print(pretty_json_string)
                 
                 for guest in guests:
+                    
+                    if guest.get("orderStatus") == "CANCELLED":
+                        continue
+                    
+                    paidPrice = guest.get("priceDetails").get("subtotal")
+                    paidQuantity = guest.get("priceDetails").get("quantity")
+                    
+                    if paidPrice == 0:
+                        continue
+                        
                     passengerId = guest.get("id")
                     firstName = guest.get("firstName").capitalize()
                     reservationId = guest.get("reservationId")
@@ -312,10 +434,22 @@ def getOrders(access_token,accountId,session,reservationId,passengerId,ship,star
                     if newKey in foundItems:
                         continue
                     foundItems.append(newKey)
-                    room = guest.get("stateroomNumber")
-                    getNewBeveragePrice(access_token,accountId,session,reservationId,ship,startDate,prefix,paidPrice,product,apobj, passengerId,firstName,room,orderCode,orderDate,owner)
+                    
+                    # New Per Day Logic From cyntil8 fork
+                    if salesUnit in [ 'PER_NIGHT', 'PER_DAY' ]:
+                        paidPrice = round(paidPrice / numberOfNights,2)
+                
+                    if paidQuantity > 0:
+                        paidPrice = round(paidPrice / paidQuantity,2)
+                        
+                    currency = guest.get("priceDetails").get("currency")
+                    room = guest.get("stateroomNumber") 
+                    #getInCartPricePrice(access_token,accountId,session,reservationId,ship,startDate,prefix,quantity,paidPrice,currency,product,apobj, guest,passengerId,firstName,room,orderCode,orderDate,owner)
+                    
+                    getNewBeveragePrice(access_token,accountId,session,reservationId,ship,startDate,prefix,paidPrice,currency,product,apobj, passengerId,firstName,room,orderCode,orderDate,owner)
 
-def get_cruise_price(url, paidPrice, apobj):
+def get_cruise_price(url, paidPrice, apobj, iteration = 0):
+        
     headers = {
         'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
         'accept-language': 'en-US,en;q=0.9',
@@ -343,14 +477,29 @@ def get_cruise_price(url, paidPrice, apobj):
     response = requests.get('https://www.'+cruiseLineName+'.com/checkout/guest-info', params=params,headers=headers)
     
     sailDate = params.get("sailDate")[0]
+    currencyCodeList = params.get("selectedCurrencyCode")
+    if currencyCodeList is None:
+        currencyCode = "USD"
+    else:
+        currencyCode = currencyCodeList[0]
+        
     sailDateDisplay = datetime.strptime(sailDate, "%Y-%m-%d").strftime(dateDisplayFormat)
-    
-    preString = sailDateDisplay + " " + params.get("shipCode")[0]+ " " + params.get("cabinClassType")[0] + " " + params.get("r0f")[0]
+    shipName = shipDictionary[params.get("shipCode")[0]]    
+    preString = sailDateDisplay + " " + shipName + " " + params.get("cabinClassType")[0] + " " + params.get("r0f")[0]
     
     roomNumberList = params.get("r0j")
     if roomNumberList:
         roomNumber = roomNumberList[0]
         preString = preString + " Cabin " + roomNumber
+    
+    if iteration > 8:
+        print("Check Cruise URL - No room available for " + preString)
+        return
+    
+    m = re.search('www.(.*).com', url)
+    cruiseLineName = m.group(1)
+    
+    response = requests.get('https://www.'+cruiseLineName+'.com/checkout/guest-info', params=params,headers=headers)
     
     soup = BeautifulSoup(response.text, "html.parser")
     soupFind = soup.find("span",attrs={"class":"SummaryPrice_title__1nizh9x5","data-testid":"pricing-total"})
@@ -362,7 +511,8 @@ def get_cruise_price(url, paidPrice, apobj):
             # Uncomment these print statements, if get into a loop
             #print(textString)
             newURL = "https://www." + cruiseLineName + ".com" + redirectString
-            get_cruise_price(newURL, paidPrice, apobj)
+            iteration = iteration + 1
+            get_cruise_price(newURL, paidPrice, apobj,iteration)
             #print("Update url to: " + newURL)
             return
         else:
@@ -373,7 +523,7 @@ def get_cruise_price(url, paidPrice, apobj):
     
     priceString = soupFind.text
     priceString = priceString.replace(",", "")
-    m = re.search("\\$(.*)USD", priceString)
+    m = re.search("\\$(.*)" + currencyCode, priceString)
     priceOnlyString = m.group(1)
     price = float(priceOnlyString)
     
@@ -418,6 +568,30 @@ def getShips():
         print(shipCode + " " + name)
     return shipCodes
 
+def getShipDictionary():
+
+    headers = {
+        'appkey': 'cdCNc04srNq4rBvKofw1aC50dsdSaPuc',
+        'accept': 'application/json',
+        'appversion': '1.54.0',
+        'accept-language': 'en',
+        'user-agent': 'okhttp/4.10.0',
+    }
+
+    params = {
+        'sort': 'name',
+    }
+
+    response = requests.get('https://api.rccl.com/en/all/mobile/v2/ships', params=params, headers=headers)
+    ships = response.json().get("payload").get("ships")
+    
+    shipCodes = {}
+    
+    for ship in ships:
+        shipCode = ship.get("shipCode")
+        name = ship.get("name")
+        shipCodes[shipCode] = name
+    return shipCodes
 
 # Get SailDates From a Ship Code
 def getSailDates(shipCode):

@@ -1,38 +1,35 @@
 # CheckRoyalCaribbeanPrice
-A script that checks if you have cheapest price for beverage package, excursions, internet, etc that you have purchased. Finds all purchased packages on your account, no need to enter them yourself. Can also check the price of a cabin if you provide the Royal Caribbean booking URL (no Royal account needed). You need to run this tool manually, inside a cron job (linux), in docker, or [task scheduler](https://www.windowscentral.com/how-create-automated-task-using-task-scheduler-windows-10) (windows). If you run Home Assistant, an addon is posted in my [addon repo](https://github.com/jdeath/homeassistant-addons) which can be called automatically.
+Checks if you have the cheapest price for your **Royal Caribbean** and **Celebrity Cruises** purchases (beverage packages, excursions, internet, etc.).  
+- ✅ Automatically checks your purchased packages (no need to enter them manually)  
+- ✅ Alerts you if a lower price is available
+- ✅ Finds deals specific to each passenger (loyalty or casino status, age-based or room specials) where other trackers only find publicly available prices
+- ✅ Shows currently assigned cabin in Royal's backend system (*likely* the room you will get if purchased a GTY "We choose your room")
+- ✅ Shows the payment balance Royal's backend system thinks they are owed (does not include TA's take!)
+- ✅ Supports multiple Royal and Celebrity accounts or linked cruises
+- ✅ Handles all currencies (checks each item based on the currency used to purchase it)
+- ✅ Can also check **cabin prices** with just a booking URL (no login required)  
+- ✅ Runs on Windows, macOS, Linux, Docker, and Home Assistant.
+- ✅ Completely open source, free to use or modify.
+- ✅ Separate `BrowseRoyalCaribbeanPrice.py` script lets you look up any cruise's addon prices, no setup required
+   
 
-This is not a hack. Developed only with Firefox and python. All the API calls are public and visible in the Firefox inspector. Everything in this code your browser is doing when you log into the Royal Caribbean website. Has saved me $200 on a cruise and $160 on execursions in one week since I wrote it! Hopefully it helps you too.
+> ⚠️ This is **not a hack**. All API calls and data are publicly available. The script simply automates what you can do on the Royal Caribbean website.
 
-~~If anyone can figure out how to get the AccountID programmatically, please do a PR. I cannot figure that out.~~ Thanks to anonymous for the fix!
+[![Stargazers repo roster for @jdeath/CheckRoyalCaribbeanPrice](https://reporoster.com/stars/jdeath/CheckRoyalCaribbeanPrice)](https://github.com/jdeath/CheckRoyalCaribbeanPrice/stargazers)
 
-Latest version will tell you the remaining balance on your booked cruises. Post an issue if this is less than your Travel Agent says you owe. My cruise shows about 10% lower than the original total fare (eg. add your paid deposit back in). I wonder if this is the TA profit?
-
-Pulls passengers' room numbers from the API. Sometimes individual excursions/packages have rooms returned by the API, where the booking still reports GTY (guarantee=room in promised class not yet assigned). If the room returned by the booking is the room you are assigned, please post an issue so this feature can be confirmed.
-
-Thanks to help from @cyntil8, supports Celebrity Cruises too. Not fully tested yet.
-
-Thanks to @tecmage for getting the tool to work mostly for the UDP, Coffee Card, and Evian Water purchases. Currently there is an issue if you buy 2x or more coffee cards. The API does not know how many you bought, so the tool will always say a cheaper price is available because it is comparing the price you paid for 2x cards with the price of a single card. Thanks to @iareanthony for fixing "The Key"
-
-Thanks to @jipis for fixing internet pricing and identifying how to find specials for individual passengers. I changed the logic to check every single passenger's order to find specials only available to them (like an unlisted 40% refreshment package July 2025 sale only available to teens) which the code was not finding. Code also avoids checking orders multiple times, which can happen when reservations are linked. 
-
-Want to monitor a friend's cruise? You can either link their cruise to your account or add their account the tracker's account list. You need their reservation number, name, and birthdate to link the cruise to your account (select my name is not listed). Then this code will check their packages which is better than having their username/password. For linked reservations, the passenger may appear to be in the wrong room. This is just a feature of the code which I cannot seem to fix. The passengers' first names booked in each room will be shown at the start of each booking. If the item was purchased by someone besides the account being used to check the price, the email will notify you that someone else must cancel/rebook. The code cannot tell you who actually booked it. If you have their username/password, you can add it to the list of accounts in the config.yaml and it will cycle though accounts automatically.
-
-Thanks to @ProxesOnBoxes for various improvements for date display options, custom configuration files, and setting a cruise friendly name.
-
-There is a free website that does price checks for beverage packages/excursions and does not log into your account. You have to add your packages manually and it will not find special deals exclusive to your account: `https://royalpricetracker.com/` . Consider using that for a simpler solution.  
-
-Without an account, you can also go to: `https://cruisespotlight.com/royal-caribbean-cruise-planner-price-lookup/`  and look up your cruise. It will point you to all the beverage, shore, internet packages right on the royal caribbean website to see the prices. Thanks to redditer @illuminated0ne for finding that. I may add looking up cruises you have not booked at a later time.
+If the code saved you money or correctly predicted your cabin number, star the repo and/or post your success on [r/RoyalCaribbean](https://www.reddit.com/r/royalcaribbean/) !
 
 ## Install (Recommended, any Operating System, and you can edit code to your liking)
 1. Install python3 (3.12 works fine) `https://www.python.org/downloads/`
-1. Download the `CheckRoyalCaribbeanPrice.py` from this repo or `git clone https://github.com/jdeath/CheckRoyalCaribbeanPrice.git`
+1. Download the [CheckRoyalCaribbeanPrice.py](https://raw.githubusercontent.com/jdeath/CheckRoyalCaribbeanPrice/refs/heads/main/CheckRoyalCaribbeanPrice.py) from this repo or `git clone https://github.com/jdeath/CheckRoyalCaribbeanPrice.git`
 1. `pip install requests Apprise bs4`
 
 ## Install (Windows 10/11 Only)
 1. Download `CheckRoyalCaribbeanPrice.exe` from release assets `https://github.com/jdeath/CheckRoyalCaribbeanPrice/releases`
-    -   Made with `pyinstaller -F --collect-all apprise --collect-all bs4 CheckRoyalCaribbeanPrice.py` (you do not need to run this command)
-    -   Note: Python code in repo may be newer than .exe file, but exe is auto created upon every release
-
+    -   Note: A windows .exe is auto created upon every release, but the Python code in repo may be newer. 
+    -   Only if you want to build a binary yourself, you can run `pyinstaller -F --collect-all apprise --collect-all bs4 CheckRoyalCaribbeanPrice.py`
+2. Make the config.yaml file as described below in the Edit Config File section
+   -   Note: if you make a text file in windows with New->Text file , it may look like it is named `config.yaml`, but it is actually named `config.yaml.txt` . In the windows file browser, go to View->Show and make sure "File Name Extensions" is checked. Then remove the .txt from the end of the file so it is actually named `config.yaml`.
 ## Install (Docker Option - thanks @JDare)
 
 ### Single Execution (One-time price check)
@@ -129,6 +126,11 @@ To override the system's default date format, set the dateDisplayFormat config v
 dateDisplayFormat: "%m/%d/%Y"
 ```
 
+To override the currency from what the API returns (what you bought the item in), set the currencyOverride config value to your desired currencyOverride. This should not be needed and should now only be needed for testing.
+```
+currencyOverride: 'DKK'
+```
+
 ## Get Cruise URL (Optional)
 1. Be sure you are logged out of the Royal Caribbean / Celebrity Website. If you are logged in, the URL you get in Step 5 will not work.
 1. Go to Royal Caribbean or Celebrity and do a mock booking of the room you have, with the same number of adults and kids
@@ -141,7 +143,7 @@ dateDisplayFormat: "%m/%d/%Y"
 1. If the code says the price is cheaper, do a mock booking to see if cabin is still available. You need to do this from a new search on the Royal Caribbean / Celebrity website. Do not just put the cruiseURL in your browser. It is possible the room is not available. Going to the cruiseURL directly might give you a false alarm and you will look like an idiot calling your travel agent!
 1. If it is lower than you paid for, the cabin is still bookable, and before final payment date call your Travel Agent or Royal Caribbean (if you booked direct) and they will reduce the price. Be careful, you will lose the onboard credit you got in your first booking, if the new booking does not still offer it!
 1. Update the pricePaid field to the new price. Remove the `$` and any `,`
-1. Works easiest on a Guarantee Cabin, where multiple of same cabin exist for purchase. If checking a "You Pick the Room", be sure to check the price of the same class of room you booked (Connecting Balcony, Balcony class 4D or 4A , etc). If the room you picked is no longer available, you need to get a URL of another room in that class. If there are no more rooms of the same class available to book, you will not be able to reprice. You will need to manually check back on the Royal website to see if a room opened up. It does not look like the API returns cruise prices, so we are left with scraping the website.
+1. Works easiest on a Guarantee Cabin, where multiple of same cabin exist for purchase. If checking a "You Pick the Room", be sure to check the price of the same class of room you booked (Connecting Balcony, Balcony class 4D or 4A , etc). If the room you picked is no longer available, you need to get a URL of another room in that class. If there are no more rooms of the same class available to book, you will not be able to reprice. You will need to manually check back on the Royal website to see if a room opened up. The API does not return cruise prices, so we are left with scraping the website.
 1. If you only want to check the cruise prices, you do not need to have your `accountInfo` and/or `apprise` in your config file, as they are not necessary.
    
 ## Apprise (Optional)
@@ -160,51 +162,84 @@ dateDisplayFormat: "%m/%d/%Y"
     - It will also tell you if the price has gone up since you purchased (do not rebook in that case!)
     - If you setup apprise, it will notify you via your preferred method(s) if you should rebook
     - Will provide you a link to the order history for that cruise and also tell you the date/order number to cancel from that list
-    - (There does not appear to be a way to construct a Web link to that specific order. If you find one, please let me know via an issue)
+      - Log in to Royal Caribbean on the web browser before clicking the link, or the link will not bring you to the correct location
+      - (There does not appear to be a way to construct a Web link to that specific order. If you find one, please let me know via an issue)  
     - After cancelling/modify the order, click the product image to reorder.
 
 ## Output
-Will output information on your purchases
+Will output information on your purchases (redacted output below)
 ```
-CONFNUM1: You have the best price for Chacchoben Ruins Exclusive Drive of: 122.99
-CONFNUM1: You have the best price for Tabyana Beach Break of: 66.99
-CONFNUM2: You have the best price for Deluxe Beverage Package of: 67.99
-CONFNUM2: 	Price of Deluxe Beverage Package is now higher: 72.99
-CONFNUM2: You have the best price for VOOM SURF + STREAM Internet Package of: 17.99
-2025-12-27 VI OUTSIDE 4N: You have best Price of 3612.12 
+09/04/25 06:02:01
+royalcaribbean me@email.com
+C&A: XXXXXXXXX DIAMOND 100 Points
+CONFNUM1: 09/11/25 Quantum of the Seas Room 1234 (Mary, Jane)
+Mary   (1234) has best price for La Cava de Marcelo: The Cheese Cave of: 84.99 (now 134.0)
+Jane   (1234) has best price for La Cava de Marcelo: The Cheese Cave of: 84.99 (now 134.0)
+Mary   (1234) has best price for Deluxe Beverage Package of: 56.99 (now 62.99)
+Jane   (1234) has best price for Deluxe Beverage Package of: 56.99 (now 62.99)
+
+CONFNUM2: 09/15/25 Brilliance of the Seas Room GTY (John, Mary)
+John   (1234) has best price for Old and New San Juan City Tour with Airport Drop-Off of: 54.99 (now 99.0)
+Mary   (1234) has best price for Old and New San Juan City Tour with Airport Drop-Off of: 54.99 (now 99.0)
+John   (1234) has best price for Deluxe Beverage Package of: 62.99 (now 72.99)
+Mary   (1234) has best price for Deluxe Beverage Package of: 62.99 (now 72.99)
+Mary   (1234) has best price for VOOM SURF + STREAM Internet Package of: 16.99 (now 18.99)
+
+2025-12-27 Vision of the Seas OUTSIDE 4N: You have best Price of 3612.12 
 ```
-If any of the prices are lower, it will send a notification if you set up apprise. Notification will include a link to your order history and the specific date and order number to cancel
+If any of the prices are lower, it will send a notification if you set up apprise. Notification will include a link to your order history and the specific date and order number to cancel. Notice on the 2nd reservation, the official room is GTY but the excursions show the currently assigned room in the Royal backend system. This room is likely what you will get!
 
 ## Automating
 1. Linux: Put in a cron job, if running in linux, I am sure you know how! Be sure to either provide optional argument for the `config.yaml` path or be sure to execute the script from within the directory where the configuration script is present.
 1. Home Assistant: Use directions in my [repo](https://github.com/jdeath/homeassistant-addons/tree/main/royalpricecheck)
+1. Docker: See directions in docker section above
 1. Windows: Use windows task schedular
-1. Create a basic task. Select a daily trigger, suggest a little before you wake up
-1. Action, select "Start a Program"
-1. In "Program/script" Select the CheckRoyalCaribbeanPrice.exe file you download from here. Make sure the config.yaml is in same directory as .exe (if running python script, should be able to put python.exe the full path of this the script location)
-1. In "Start in (optional)" enter the directory of the .exe/.yaml (you can copy the "Program/script" field, paste it, and remove the CheckRoyalCaribbeanPrice.exe)
-1. After clicking finish, you can right click on task, go to triggers, and add more times to trigger the script. Suggest a time right before you get home from work. Twice a day should be sufficient
-1. Ensure apprise notifications are working, because the window will close automatically after run.
-   
-## Notes
-1. Confirm price is still lower on website, because it could have gone up since running this bot
-1. You need to first cancel your beverage package, shore excursion, internet, etc
-1. Wait about 10s
-1. Rebook at the lower price.
-1. It takes about a week for Royal to refund your credit card, but they charge you new price right away!
-1. Enjoy youtube videos on cruising from: `https://www.royalcaribbeanblog.com/`, `https://www.youtube.com/royalcaribbeanblog` and `https://www.youtube.com/@LifeWellCruised`
-1. If you cancel the Ultimate Dinning Package and rebook, all your reservations will be cancelled. Doing this too close to the cruise may cause you to not get your old reservation times. Reddit says to go to any open restaurant when you board to book/switch to your prefered times.
-1. Maybe Matt or Ilana will feature this tool in a video !
-1. Update: Mentioned on RoyalCaribbeanBlog.com: `https://www.royalcaribbeanblog.com/2025/04/19/cruise-price-trackers` 
+    1. Create a basic task. Select a daily trigger, suggest a little before you wake up
+    1. Action, select "Start a Program"
+    1. In "Program/script" Select the CheckRoyalCaribbeanPrice.exe file you download from here. Make sure the config.yaml is in same directory as .exe (if running python script, should be able to put python.exe the full path of this the script location)
+    1. In "Start in (optional)" enter the directory of the .exe/.yaml (you can copy the "Program/script" field, paste it, and remove the CheckRoyalCaribbeanPrice.exe)
+    1. After clicking finish, you can right click on task, go to triggers, and add more times to trigger the script. Suggest a time right before you get home from work. Twice a day should be sufficient
+    1. Ensure apprise notifications are working, because the window will close automatically after run.
 
+## Other Notes
+**Want to monitor a friend's cruise?** You can either link their cruise to your account or add their account the `config.yaml` account list. On the Royal Website, you need their reservation number, name, and birthdate to link the cruise to your account (select my name is not listed). Then this code will check their packages which avoids needing their username/password. For linked reservations, the passenger may appear to be in the wrong room. This is just a feature of the code which I cannot seem to fix. The correct passengers' first names booked in each room will be shown for each booking. If the item was purchased by someone besides the account being used to check the price, the email will notify you that someone else must cancel/rebook. The code cannot tell you who actually booked it. Note, linked reservations can be confusing to cancel/rebook. If the Royal App/Website says you cannot cancel the reservation because you did not make it, you need to try all combonations. For instance, try looking at the orders on your account on "My Cruise" and also the orders on your account but on "Linked Cruise". If the other person you are linked to actually bought it, they will have to try both My Cruise and Linked Cruise.
+
+If you have their username/password, you can add it to the list of accounts in the config.yaml and it will cycle though accounts automatically.
+
+**Do you have a GTY Room and want to know the room you will likely get?** If a room is not officially assigned yet, the code displays GTY (meaning guarantee) for your room number. However, any excursion purchased will show the passenger's name and the room number currently associated with that excursion. Guess what? That room number is likely the room you will be officially assigned. Confirmed by the author, please post an issue if you can confirm this as well.
+
+**Are you browsing the website for the best prices?** Always add the item to your cart and then go to the check phase where you enter your credit card. Often the price will be lower in the screen where you enter your credit card then in your cart. If on the fense, do the extra step and you may be suprised!
+
+## Related Tools
+
+- [RoyalPriceTracker.com](https://royalpricetracker.com/) – simpler, but you must enter purchases manually, public price only  
+- [CruiseSpotlight Price Lookup](https://cruisespotlight.com/royal-caribbean-cruise-planner-price-lookup/) – public price lookup for any cruise  
+- `BrowseRoyalCaribbeanPrice.py` – included here for fun; lets you explore public prices with one script  
+
+## Credits
+
+Thanks to contributors:
+- Anonymous (Retrieve AccountID programmatically)
+- @cyntil8 (Celebrity support, per-day pricing)  
+- @tecmage (UDP, Coffee Card, Evian Water logic)  
+- @iareanthony (fixed "The Key")  
+- @jipis (internet pricing & passenger specials)  
+- @ProxesOnBoxes (date display options, config improvements)  
+- @RoyalCaribbeanBlog.com for featuring in an [article](https://www.royalcaribbeanblog.com/2025/04/19/cruise-price-trackers)
 # Issues
-1. Will not work if your password has an % in it. Change your password (replace % with ! for instance). Working on a fix
-1. Only checks adult prices, if only have child prices in an order it may not work. I don't have kids, so can not check.
-1. It should handle orders made by other people in your party (works in my partner's account for what I booked)
-1. May not handle all orders correctly.
-1. Prices of internet, beverage packages, and "The Key" are per day, this code divides by the length of your cruise. If you buy a partial package, this logic may not work correctly.
-1. If other prices are per day, it will not work. Let me know if other daily purchases are not calculating correctly.
+1. Will not work if your password has an % in it. Change your password (replace % with ! for instance). Working on a fix. PRs welcome
+1. Only checks adult prices (> 12 years old), if only have child prices in an order it may not work. I don't have kids, so I can not fix. PRs welcome
+1. Handles orders made by other people in your party or linked cruises (even if you are not sailing on it)
+1. It should give you the price of the item in the same currency you bought it in. Post an issue if not working correctly.
+1. May not handle all orders correctly. Purchases of multiple coffee cards and Evian water should now work.
+1. Prices of internet, beverage packages, and "The Key" are per day, this code divides by the length of your cruise. If you buy a partial package, this logic may not work correctly. If any per-day item is not calculated correctly, post an issue.
 1. Please double check that the price is lower before you rebook! I am not responsible if you book at a higher price!
+1. Double check you are cancelling the item for the correct cruise
+
+# Browse RoyalCaribbean Prices
+This is a new script that will browse any Royal Caribbean or Celebrity sailing and show current public prices for excursions/drink packages/etc. If you book the cruise, the price could be lower than shown due to C&A or casino specials. You simply run the script `python BrowseRoyalCaribbeanPrice.py` or `BrowseRoyalCaribbeanPrice.exe`. It will prompt you to select the ship and sailing. It will provide a link to the Royal Caribbean website which has the product prices for that cruise (be sure to be logged out of the RC website or link will not work). Code will also print all the prices. This does not require a Royal Caribbean or Celebrity account and can be used by anyone. Inspired by and similar functionality to `https://cruisespotlight.com/royal-caribbean-cruise-planner-price-lookup/`. Defaults to USD currency. If you want a different currency, for example DKK, run `python BrowseRoyalCaribbeanPrice.py -c DKK` or  `BrowseRoyalCaribbeanPrice.exe -c DKK`
+
+There are no plans to add price checking/price history to this script. Use the `CheckRoyalCaribbeanPrice.py` script for that. If you really want to check public prices which may not be representative of the real deal you can get, just use `RoyalPriceTracker.com`.
 
 # Spreadsheet scripts
 There are four standalone python scripts to do various things and save the results to spreadsheets. Requires config.yaml as explained above for account login information and which cruises to track. Requires python library openpyxl to handle the spreadsheets. Added to requirements.txt.
