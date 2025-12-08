@@ -221,21 +221,41 @@ def getProducts(access_token,accountId,session,reservationId,passengerId,ship,st
                     displayUnit = item["unit"]["name"]
                 else:
                     displayUnit = "None"
-                sheet.append([category, item["title"], item["msrpAdultPrice"], item["lowestAdultPrice"], displayUnit, displayName, promotionValue, discountedValue])
-                sheet.cell(row=currow, column=3).number_format = '"$"#,##0.00'
-                sheet.cell(row=currow, column=4).number_format = '"$"#,##0.00'
-                sheet.cell(row=currow, column=7).number_format = FORMAT_PERCENTAGE
-                sheet.cell(row=currow, column=8).number_format = '"$"#,##0.00'
-                for element in compPrice:
-                    if element["key"] == category + "|" + item["title"] and element["msrp"] == item["msrpAdultPrice"]:
-                        if item["lowestAdultPrice"] > element["price"]:
-                            sheet.cell(row=currow, column=4).fill = redFill
-                            print(cruiseLineCode, reservationId, "Price increase:", category, item["title"], "from ${:0,.2f}".format(element["price"]), "to ${:0,.2f}".format(item["lowestAdultPrice"]))
-                        elif item["lowestAdultPrice"] < element["price"]:
-                            sheet.cell(row=currow, column=4).fill = greenFill
-                            print(cruiseLineCode, reservationId, "Price decrease:", category, item["title"], "from ${:0,.2f}".format(element["price"]), "to ${:0,.2f}".format(item["lowestAdultPrice"]))
-                        break
-                currow += 1
+                if len(item["variantIdList"]) > 1:
+                    # There are variants. Add row for each
+                    for optn in item["variantIdList"]:
+                        variant = getVariant(access_token,accountId,session,reservationId,passengerId,ship,startDate,product,optn,currencyCode)
+                        sheet.append([category, item["title"] + " - " + variant["description"], variant["msrp"], variant["price"], displayUnit, variant["promoDescription"], variant["promotionValue"], variant["discountedValue"]])
+                        sheet.cell(row=currow, column=3).number_format = '"$"#,##0.00'
+                        sheet.cell(row=currow, column=4).number_format = '"$"#,##0.00'
+                        sheet.cell(row=currow, column=7).number_format = FORMAT_PERCENTAGE
+                        sheet.cell(row=currow, column=8).number_format = '"$"#,##0.00'
+                        for element in compPrice:
+                            if element["key"] == category + "|" + item["title"] and element["msrp"] == item["msrpAdultPrice"]:
+                                if item["lowestAdultPrice"] > element["price"]:
+                                    sheet.cell(row=currow, column=4).fill = redFill
+                                    print(cruiseLineCode, reservationId, "Price increase:", category, item["title"], "from ${:0,.2f}".format(element["price"]), "to ${:0,.2f}".format(item["lowestAdultPrice"]))
+                                elif item["lowestAdultPrice"] < element["price"]:
+                                    sheet.cell(row=currow, column=4).fill = greenFill
+                                    print(cruiseLineCode, reservationId, "Price decrease:", category, item["title"], "from ${:0,.2f}".format(element["price"]), "to ${:0,.2f}".format(item["lowestAdultPrice"]))
+                                break
+                        currow += 1
+                else:
+                    sheet.append([category, item["title"], item["msrpAdultPrice"], item["lowestAdultPrice"], displayUnit, displayName, promotionValue, discountedValue])
+                    sheet.cell(row=currow, column=3).number_format = '"$"#,##0.00'
+                    sheet.cell(row=currow, column=4).number_format = '"$"#,##0.00'
+                    sheet.cell(row=currow, column=7).number_format = FORMAT_PERCENTAGE
+                    sheet.cell(row=currow, column=8).number_format = '"$"#,##0.00'
+                    for element in compPrice:
+                        if element["key"] == category + "|" + item["title"] and element["msrp"] == item["msrpAdultPrice"]:
+                            if item["lowestAdultPrice"] > element["price"]:
+                                sheet.cell(row=currow, column=4).fill = redFill
+                                print(cruiseLineCode, reservationId, "Price increase:", category, item["title"], "from ${:0,.2f}".format(element["price"]), "to ${:0,.2f}".format(item["lowestAdultPrice"]))
+                            elif item["lowestAdultPrice"] < element["price"]:
+                                sheet.cell(row=currow, column=4).fill = greenFill
+                                print(cruiseLineCode, reservationId, "Price decrease:", category, item["title"], "from ${:0,.2f}".format(element["price"]), "to ${:0,.2f}".format(item["lowestAdultPrice"]))
+                            break
+                    currow += 1
 
     sheet.freeze_panes = 'A2'
     workbook.save(wbName)
@@ -332,6 +352,43 @@ def getCurrentPrice(access_token,accountId,session,reservationId,passengerId,shi
         text = reservationId + ": " + title + " - Paid price: {:0,.2f}".format(paidPrice) + " Current price not available. Product code: " + product
 
     print(text)
+
+def getVariant(access_token,accountId,session,reservationId,passengerId,ship,startDate,prefix,product,currencyCode):    
+    
+    variant = { 'product': product, 'description': '', 'price': None, 'msrp': None, 'promotionValue': None, 'discountedValue': None, 'promoDescription': 'None' }
+
+    headers = {
+        'Access-Token': access_token,
+        'AppKey': appKey,
+        'vds-id': accountId,
+    }
+
+    params = {
+        'reservationId': reservationId,
+        'startDate': startDate,
+        'passengerId': passengerId,
+        'currencyIso': currencyCode,
+    }
+
+    response = session.get(
+        'https://aws-prd.api.rccl.com/en/royal/web/commerce-api/catalog/v2/' + ship + '/categories/' + prefix + '/products/' + str(product),
+        params=params,
+        headers=headers,
+    )
+
+    variant["description"] = response.json().get("payload").get("baseOptions")[0].get("selected").get("variantOptionQualifiers")[0].get("value")
+    try:
+        variant["price"] = response.json().get("payload").get("startingFromPrice").get("adultPromotionalPrice")
+        if not variant["price"]:
+             variant["price"] = response.json().get("payload").get("startingFromPrice").get("adultShipboardPrice")
+        variant["msrp"] = response.json().get("payload").get("startingFromPrice").get("adultShipboardPrice")
+        variant["promoDescription"] = response.json().get("payload").get("promoDescription").get("displayName")
+        variant["discountedValue"] = response.json().get("payload").get("promoDescription").get("discountedValue")
+        variant["promotionValue"] = int(response.json().get("payload").get("promoDescription").get("promotionValue")) / 100
+    except:
+        pass
+
+    return variant
 
 if __name__ == "__main__":
     main()
