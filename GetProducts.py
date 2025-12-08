@@ -13,7 +13,7 @@ import argparse
 
 appKey = "qpRMO6lj4smwkT1sWlSdIj7b8QF5rG8Q"
 cruiselines = []
-cruiselines.append({"lineName": "royalcaribbean", "lineCode": "R", "linePretty": "Royal Caribbean", "productList": ["beverage","dining","internet","onboardactivities","photoPackage","gifts","key","packages","cococay","royalbeachclub","arcade","spa"]})
+cruiselines.append({"lineName": "royalcaribbean", "lineCode": "R", "linePretty": "Royal Caribbean", "productList": ["beverage","dining","internet","onboardactivities","photoPackage","gifts","key","roomdelivery","packages","cococay","royalbeachclub","arcade","spa","preandpost"]})
 cruiselines.append({"lineName": "celebritycruises", "lineCode": "C", "linePretty": "Celebrity", "productList": ["drinks","food","packages","shipexcursions","roomdelivery","spa","wifi","exclusiveexperiences","giftsandextras","preandpost","photoPackage","fitness","programming"]})
 
 def main():
@@ -282,7 +282,7 @@ def getOrders(access_token,accountId,session,reservationId,passengerId,ship,star
                 if orderDetail.get("guests")[0].get("orderStatus") == "CANCELLED":
                     continue
                 order_title = orderDetail.get("productSummary").get("title")
-                product = orderDetail.get("productSummary").get("id")
+                product = orderDetail.get("productSummary").get("baseId")
                 prefix = orderDetail.get("productSummary").get("productTypeCategory").get("id")
                 paidPrice = orderDetail.get("guests")[0].get("priceDetails").get("subtotal")
                 # These packages report total price, must divide by number of days
@@ -329,7 +329,7 @@ def getCurrentPrice(access_token,accountId,session,reservationId,passengerId,shi
         else:
             text += " - unchanged"
     else:
-        text = reservationId + ": " + title + " - Paid price: {:0,.2f}".format(paidPrice) + " Current price not available"
+        text = reservationId + ": " + title + " - Paid price: {:0,.2f}".format(paidPrice) + " Current price not available. Product code: " + product
 
     print(text)
 

@@ -408,7 +408,8 @@ def getOrders(access_token,accountId,session,reservationId,passengerId,ship,star
                 if paidPrice == 0:
                     continue
                 # These packages report total price, must divide by number of days
-                if orderDetail.get("productSummary").get("salesUnit") in [ 'PER_NIGHT', 'PER_DAY' ]:
+                salesUnit = orderDetail.get("productSummary").get("salesUnit")
+                if salesUnit in [ 'PER_NIGHT', 'PER_DAY' ]:
                     paidPrice = round(paidPrice / numberOfNights,2)
                 #print(orderDetail)
                 
