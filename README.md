@@ -2,13 +2,13 @@
 Checks if you have the cheapest price for your **Royal Caribbean** and **Celebrity Cruises** purchases (beverage packages, excursions, internet, etc.).  
 - ✅ Automatically checks your purchased packages (no need to enter them manually)  
 - ✅ Alerts you if a lower price is available
-- ✅ Finds deals specific to each passenger (loyalty or casino status, age-based or room specials) where other trackers only find publicly available prices
+- ✅ Finds deals specific to each passenger (loyalty or casino status, age-based or room specials) where other "royal" price trackers only find publicly available prices
 - ✅ Shows currently assigned cabin in Royal's backend system (*likely* the room you will get if purchased a GTY "We choose your room")
 - ✅ Shows the payment balance Royal's backend system thinks they are owed (does not include TA's take!)
 - ✅ Supports multiple Royal and Celebrity accounts or linked cruises
 - ✅ Handles all currencies (checks each item based on the currency used to purchase it)
 - ✅ Can also check **cabin prices** with just a booking URL (no login required)  
-- ✅ Runs on Windows, macOS, Linux, Docker, and Home Assistant.
+- ✅ Runs on Windows, macOS, Linux, Docker, iOS, and Home Assistant.
 - ✅ Completely open source, free to use or modify.
 - ✅ Separate `BrowseRoyalCaribbeanPrice.py` script lets you look up any cruise's addon prices, no setup required
    
@@ -30,6 +30,26 @@ If the code saved you money or correctly predicted your cabin number, star the r
     -   Only if you want to build a binary yourself, you can run `pyinstaller -F --collect-all apprise --collect-all bs4 CheckRoyalCaribbeanPrice.py`
 2. Make the config.yaml file as described below in the Edit Config File section
    -   Note: if you make a text file in windows with New->Text file , it may look like it is named `config.yaml`, but it is actually named `config.yaml.txt` . In the windows file browser, go to View->Show and make sure "File Name Extensions" is checked. Then remove the .txt from the end of the file so it is actually named `config.yaml`.
+
+## Install (iOS / iPhone - May work for Android too)
+This will run a stripped down version to work on the free Python iPhone app. As stripped down, it only supports excursion/drink packages etc. It does not support cruise fare price checks. It does not support apprise notifications, so you will have to watch the log to see any price drops. You need to edit the python file directly (directions below) because it does not use the config.yaml file. But allows you to check prices on the go, should work on the ship even without the internet package!
+
+1. Get Python From Appstore. `https://apps.apple.com/us/app/python-coding-editor-ide-app/id6444399635`
+   -   Free version is fine, no need to make inapp purchases
+   -   Please let me know if there is an Android app equivalent that works
+2. Download `https://raw.githubusercontent.com/jdeath/CheckRoyalCaribbeanPrice/refs/heads/main/PhonePriceCheck.py` from the repo to your computer
+   -   Use a text editor to add your username and password between the "" a few lines down.
+   -   If you are are using a Celebrity account, remove `#` before `#cruiseLineName = "celebritycruises"`
+   -   Ignore the `Edit Config File` section below, that only pretains to computer installations
+3. Email yourself the edited `PhonePriceCheck.py`
+   -    On your iPhone, save the emailed `PhonePriceCheck.py` to your files section. This can be done by clicking the attachment, select share, then select saved files
+4. Open Python App
+   -    Tap the blue hamburger icon just below the adverstisement
+   -    Tap "Load from File"
+   -    Select the PhonePriceCheck.py file you downloaded
+   -    To run: tap the arrow icon at top right of screen (between a bug icon and a `...` icon)
+6. Look for any price drops in the output
+
 ## Install (Docker Option - thanks @JDare)
 
 ### Single Execution (One-time price check)
@@ -202,17 +222,19 @@ If any of the prices are lower, it will send a notification if you set up appris
     1. Ensure apprise notifications are working, because the window will close automatically after run.
 
 ## Other Notes
-**Want to monitor a friend's cruise?** You can either link their cruise to your account or add their account the `config.yaml` account list. On the Royal Website, you need their reservation number, name, and birthdate to link the cruise to your account (select my name is not listed). Then this code will check their packages which avoids needing their username/password. For linked reservations, the passenger may appear to be in the wrong room. This is just a feature of the code which I cannot seem to fix. The correct passengers' first names booked in each room will be shown for each booking. If the item was purchased by someone besides the account being used to check the price, the email will notify you that someone else must cancel/rebook. The code cannot tell you who actually booked it. Note, linked reservations can be confusing to cancel/rebook. If the Royal App/Website says you cannot cancel the reservation because you did not make it, you need to try all combonations. For instance, try looking at the orders on your account on "My Cruise" and also the orders on your account but on "Linked Cruise". If the other person you are linked to actually bought it, they will have to try both My Cruise and Linked Cruise.
+**Want to monitor a friend's cruise?** You can either link their cruise to your account or add their account the `config.yaml` account list. 
+
+On the Royal Website, you need their reservation number, name, and birthdate to link the cruise to your account (select my name is not listed). Then this code will check their packages which avoids needing their username/password. For linked reservations, the passenger may appear to be in the wrong room. This is just a feature of the code which I cannot seem to fix. The correct passengers' first names booked in each room will be shown for each booking. If the item was purchased by someone besides the account being used to check the price, the email will notify you that someone else must cancel/rebook. The code cannot tell you who actually booked it. Note, linked reservations can be confusing to cancel/rebook. If the Royal App/Website says you cannot cancel the reservation because you did not make it, you need to try all combonations. For instance, try looking at the orders on your account on "My Cruise" and also the orders on your account but on "Linked Cruise". If the other person you are linked to actually bought it, they will have to try both My Cruise and Linked Cruise.
 
 If you have their username/password, you can add it to the list of accounts in the config.yaml and it will cycle though accounts automatically.
 
 **Do you have a GTY Room and want to know the room you will likely get?** If a room is not officially assigned yet, the code displays GTY (meaning guarantee) for your room number. However, any excursion purchased will show the passenger's name and the room number currently associated with that excursion. Guess what? That room number is likely the room you will be officially assigned. Confirmed by the author, please post an issue if you can confirm this as well.
 
-**Are you browsing the website for the best prices?** Always add the item to your cart and then go to the check phase where you enter your credit card. Often the price will be lower in the screen where you enter your credit card then in your cart. If on the fense, do the extra step and you may be suprised!
+**Are you browsing the website for the best prices?** Always add the item to your cart and then go to the next page where you enter your credit card. Often the price will be lower in the screen where you enter your credit card then in your cart. If on the fense, do the extra step and you may be suprised!
 
 ## Related Tools
 
-- [RoyalPriceTracker.com](https://royalpricetracker.com/) – simpler, but you must enter purchases manually, public price only  
+- [RoyalPriceTracker.com](https://royalpricetracker.com/) – simpler, but you must enter purchases manually, public price only which may miss many specials
 - [CruiseSpotlight Price Lookup](https://cruisespotlight.com/royal-caribbean-cruise-planner-price-lookup/) – public price lookup for any cruise  
 - `BrowseRoyalCaribbeanPrice.py` – included here for fun; lets you explore public prices with one script  
 
