@@ -399,15 +399,10 @@ def getOrders(access_token,accountId,session,reservationId,passengerId,ship,star
                 quantity = orderDetail.get("priceDetails").get("quantity")
                 order_title = orderDetail.get("productSummary").get("title")
                 
-                product = orderDetail.get("productSummary").get("id")
+                #product = orderDetail.get("productSummary").get("id")
+                product = orderDetail.get("productSummary").get("baseId")
                 prefix = orderDetail.get("productSummary").get("productTypeCategory").get("id")
-                
-                if prefix == "pt_internet" or prefix == "pt_beverage":
-                    product = orderDetail.get("productSummary").get("baseId")
-                paidPrice = orderDetail.get("guests")[0].get("priceDetails").get("subtotal")
-                if paidPrice == 0:
-                    continue
-                # These packages report total price, must divide by number of days
+              
                 salesUnit = orderDetail.get("productSummary").get("salesUnit")
                 if salesUnit in [ 'PER_NIGHT', 'PER_DAY' ]:
                     paidPrice = round(paidPrice / numberOfNights,2)
