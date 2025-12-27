@@ -403,11 +403,7 @@ def getOrders(access_token,accountId,session,reservationId,passengerId,ship,star
                 product = orderDetail.get("productSummary").get("baseId")
                 prefix = orderDetail.get("productSummary").get("productTypeCategory").get("id")
               
-                salesUnit = orderDetail.get("productSummary").get("salesUnit")
-                if salesUnit in [ 'PER_NIGHT', 'PER_DAY' ]:
-                    paidPrice = round(paidPrice / numberOfNights,2)
-                #print(orderDetail)
-                
+                salesUnit = orderDetail.get("productSummary").get("salesUnit")               
                 guests = orderDetail.get("guests")
                 
                 for guest in guests:
