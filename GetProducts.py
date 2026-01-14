@@ -331,14 +331,17 @@ def getCurrentPrice(access_token,accountId,session,reservationId,passengerId,shi
         headers=headers,
     )
     
-    title = response.json().get("payload").get("title")
+    title = "Product code: " + product
     currentPrice = None
-    try:
-        currentPrice = response.json().get("payload").get("startingFromPrice").get("adultPromotionalPrice")
-        if not currentPrice:
-            currentPrice = response.json().get("payload").get("startingFromPrice").get("adultShipboardPrice")
-    except:
-        pass
+
+    if response.status_code == 200:
+        try:
+            title = response.json().get("payload").get("title")
+            currentPrice = response.json().get("payload").get("startingFromPrice").get("adultPromotionalPrice")
+            if not currentPrice:
+                currentPrice = response.json().get("payload").get("startingFromPrice").get("adultShipboardPrice")
+        except:
+            pass
     
     if currentPrice:
         text = reservationId + ": " + title + " - Paid price: {:0,.2f}".format(paidPrice) + " Current price: {:0,.2f}".format(currentPrice)
@@ -349,7 +352,7 @@ def getCurrentPrice(access_token,accountId,session,reservationId,passengerId,shi
         else:
             text += " - unchanged"
     else:
-        text = reservationId + ": " + title + " - Paid price: {:0,.2f}".format(paidPrice) + " Current price not available. Product code: " + product
+        text = reservationId + ": " + title + " - Paid price: {:0,.2f}".format(paidPrice) + " Current price not available."
 
     print(text)
 
@@ -376,17 +379,18 @@ def getVariant(access_token,accountId,session,reservationId,passengerId,ship,sta
         headers=headers,
     )
 
-    variant["description"] = response.json().get("payload").get("baseOptions")[0].get("selected").get("variantOptionQualifiers")[0].get("value")
-    try:
-        variant["price"] = response.json().get("payload").get("startingFromPrice").get("adultPromotionalPrice")
-        if not variant["price"]:
-             variant["price"] = response.json().get("payload").get("startingFromPrice").get("adultShipboardPrice")
-        variant["msrp"] = response.json().get("payload").get("startingFromPrice").get("adultShipboardPrice")
-        variant["promoDescription"] = response.json().get("payload").get("promoDescription").get("displayName")
-        variant["discountedValue"] = response.json().get("payload").get("promoDescription").get("discountedValue")
-        variant["promotionValue"] = int(response.json().get("payload").get("promoDescription").get("promotionValue")) / 100
-    except:
-        pass
+    if response.status_code == 200:
+        try:
+            variant["description"] = response.json().get("payload").get("baseOptions")[0].get("selected").get("variantOptionQualifiers")[0].get("value")
+            variant["price"] = response.json().get("payload").get("startingFromPrice").get("adultPromotionalPrice")
+            if not variant["price"]:
+                variant["price"] = response.json().get("payload").get("startingFromPrice").get("adultShipboardPrice")
+            variant["msrp"] = response.json().get("payload").get("startingFromPrice").get("adultShipboardPrice")
+            variant["promoDescription"] = response.json().get("payload").get("promoDescription").get("displayName")
+            variant["discountedValue"] = response.json().get("payload").get("promoDescription").get("discountedValue")
+            variant["promotionValue"] = int(response.json().get("payload").get("promoDescription").get("promotionValue")) / 100
+        except:
+            pass
 
     return variant
 

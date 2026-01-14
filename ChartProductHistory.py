@@ -12,6 +12,8 @@ def build_chart_from_description(filename, description):
     max_amt = None
     prev_amt = 0
     prev_cnt = 0
+    earliest = None
+    latest = None
     
     for sheetname in wb.sheetnames:
         if "Chart " in sheetname or sheetname == "Sheet":
@@ -21,7 +23,15 @@ def build_chart_from_description(filename, description):
         for row in sheet.iter_rows(min_row=2, values_only=True):
             desc = row[1]
             amount = row[3]
-            if desc and description.lower() in str(desc).lower():
+            if desc and description.lower() == str(desc).lower():
+                if earliest is None:
+                    earliest = date
+                if latest is None:
+                    latest = date
+                if date < earliest:
+                    earliest = date
+                if date > latest:
+                    latest = date
                 if prev_amt is None:
                     prev_amt = amount
                 if amount != prev_amt:
@@ -32,12 +42,15 @@ def build_chart_from_description(filename, description):
                 if min_amt is None or amount < min_amt:
                     min_amt = amount
                 results.append((date, amount))
+                break
 
     if results:
-        print("Minimum price", "${:0,.2f}".format(min_amt), "Maximum price", "${:0,.2f}".format(max_amt),"Price changes", str(prev_cnt))
+        num_days = latest - earliest
+        print(description + ":", "Minimum price:", "${:0,.2f},".format(min_amt), "Maximum price:", "${:0,.2f},".format(max_amt),"Price changes over {} days:".format(num_days.days), str(prev_cnt))
         results.sort(key=lambda x: x[0])
 
-        chart_sheet_name = "Chart " + description[:24]
+        chart_sheet_name = "Chart " + description.replace(':','')[:24]
+        print(chart_sheet_name)
         if chart_sheet_name in wb.sheetnames:
             chart_sheet = wb[chart_sheet_name]
             wb.remove(chart_sheet)
@@ -47,14 +60,16 @@ def build_chart_from_description(filename, description):
         for date, amount in results:
             chart_sheet.append([date, amount])
 
+        limit = 20
+
         chart = BarChart()
         chart.title = description
         chart.x_axis.title = "Date"
         chart.legend.position = "b"
         chart.y_axis.title = "Amount"
-        chart.y_axis.scaling.min = min_amt - 20 # minimum limit of axis
-        chart.y_axis.scaling.max = max_amt + 20 # maximum limit if axis
-        chart.y_axis.majorUnit = 20   # spacing of gridlines
+        chart.y_axis.scaling.min =  max(0, min_amt -limit) # minimum limit of axis
+        chart.y_axis.scaling.max = max_amt + limit # maximum limit if axis
+        chart.y_axis.majorUnit = limit   # spacing of gridlines
 
         data = Reference(chart_sheet, min_col=2, min_row=1, max_row=len(results)+1)
         cats = Reference(chart_sheet, min_col=1, min_row=2, max_row=len(results)+1)
@@ -63,6 +78,11 @@ def build_chart_from_description(filename, description):
         chart.set_categories(cats)
 
         chart_sheet.add_chart(chart, "E5")
+
+        chart = LineChart()
+        chart.add_data(data, titles_from_data=True)
+        chart.set_categories(cats)
+        chart_sheet.add_chart(chart, "E20")
 
         wb.save(filename)
 

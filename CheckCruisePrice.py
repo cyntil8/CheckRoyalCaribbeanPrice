@@ -39,7 +39,7 @@ def main():
                         compPrice = float(cruises['paidPrice'])
                         get_cruise_price(timestamp, cruises['cruiseURL'], compPrice, cruiseline['lineName'])
             
-def get_cruise_price(timestamp, url, compPrice, cruiseLineName):
+def get_cruise_price(timestamp, url, compPrice, cruiseLineName, iteration = 0):
 
     headers = {
         'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
@@ -65,17 +65,22 @@ def get_cruise_price(timestamp, url, compPrice, cruiseLineName):
     
     preString = params.get("sailDate")[0] + " " + params.get("shipCode")[0]+ " " + params.get("r0d")[0] + " " + params.get("r0f")[0]
     
+    if iteration > 4:
+        print("Check Cruise URL - No room available for " + preString)
+        return
+
     soup = BeautifulSoup(response.text, "html.parser")
     soupFind = soup.find("span",attrs={"class":"SummaryPrice_title__1nizh9x5","data-testid":"pricing-total"})
     if soupFind is None:
         m = re.search("\"B:0\",\"NEXT_REDIRECT;replace;(.*);307;", response.text)
         if m is not None:
             redirectString = m.group(1)
-            textString = preString + ": URL Not Working - Redirecting to suggested room"
-            print(textString)
+            #textString = preString + ": URL Not Working - Redirecting to suggested room"
+            #print(textString)
             newURL = "https://www." + cruiseLineName + ".com" + redirectString
-            get_cruise_price(timestamp, newURL, compPrice, cruiseLineName)
-            print("Update url to: " + newURL)
+            iteration += 1
+            get_cruise_price(timestamp, newURL, compPrice, cruiseLineName, iteration)
+            #print("Update url to: " + newURL)
             return
         else:
             textString = preString + " No Longer Available To Book"
