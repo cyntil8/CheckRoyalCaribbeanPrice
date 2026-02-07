@@ -10,13 +10,32 @@ from openpyxl.styles import Alignment
 from openpyxl.styles.numbers import FORMAT_PERCENTAGE
 from openpyxl.styles import PatternFill
 import argparse
+from babel.numbers import get_currency_precision, get_currency_symbol, format_currency
 
 appKey = "qpRMO6lj4smwkT1sWlSdIj7b8QF5rG8Q"
 cruiselines = []
 cruiselines.append({"lineName": "royalcaribbean", "lineCode": "R", "linePretty": "Royal Caribbean", "productList": ["beverage","dining","internet","onboardactivities","photoPackage","gifts","key","roomdelivery","packages","cococay","royalbeachclub","arcade","spa","preandpost"]})
 cruiselines.append({"lineName": "celebritycruises", "lineCode": "C", "linePretty": "Celebrity", "productList": ["drinks","food","packages","shipexcursions","roomdelivery","spa","wifi","exclusiveexperiences","giftsandextras","preandpost","photoPackage","fitness","programming"]})
+currencyCode = 'USD'
+localeCode = 'en_US'
+
+CURRENCY_TO_LOCALE = { # Used for orders if order currency is different than the default
+    "USD": "en_US",
+    "EUR": "de_DE",   # or fr_FR — you must choose
+    "GBP": "en_GB",
+    "AUD": "en_AU",
+    "CAD": "en_CA",
+    "DKK": "da_DK",
+    "SEK": "sv_SE",
+    "NOK": "nb_NO",
+    "JPY": "ja_JP",
+    "CHF": "de_CH",
+    "NZD": "en_NZ",
+}
 
 def main():
+    global currencyCode, localeCode
+
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     print(timestamp)
           
@@ -31,19 +50,20 @@ def main():
     with open('config.yaml', 'r') as file:
         data = yaml.safe_load(file)
         
-        currencyCode = 'USD'
         if 'currency' in data:
             currencyCode = data['currency']
+        if 'locale' in data:
+            localeCode = data['locale']
 
         if 'accountInfo' in data:
             for accountInfo in data['accountInfo']:
                 username = accountInfo['username']
                 password = accountInfo['password']
-                print(username, "Currency:", currencyCode) 
+                print(username, "Currency:", currencyCode, "Locale:", localeCode) 
                 session = requests.session()
                 for cruiseline in cruiselines:
                     access_token,accountId,session = login(username,password,session,cruiseline['lineName'])
-                    getVoyages(bookingID, access_token,accountId,session,cruiseline['lineCode'],cruiseline['productList'],currencyCode)
+                    getVoyages(bookingID, access_token,accountId,session,cruiseline['lineCode'],cruiseline['productList'])
             
 def login(username,password,session,cruiseLineName):
     headers = {
@@ -69,7 +89,7 @@ def login(username,password,session,cruiseLineName):
     accountId = auth_info["sub"]
     return access_token,accountId,session
 
-def getVoyages(bookingID,access_token,accountId,session,cruiseLineCode,productList,currencyCode):
+def getVoyages(bookingID,access_token,accountId,session,cruiseLineCode,productList):
 
     headers = {
         'Access-Token': access_token,
@@ -96,10 +116,10 @@ def getVoyages(bookingID,access_token,accountId,session,cruiseLineCode,productLi
         sailDate = booking.get("sailDate")
         numberOfNights = booking.get("numberOfNights")
         shipCode = booking.get("shipCode")
-        getProducts(access_token,accountId,session,reservationId,passengerId,shipCode,sailDate,cruiseLineCode,productList,currencyCode)
-        getOrders(access_token,accountId,session,reservationId,passengerId,shipCode,sailDate,numberOfNights,currencyCode)
+        getProducts(access_token,accountId,session,reservationId,passengerId,shipCode,sailDate,cruiseLineCode,productList)
+        getOrders(access_token,accountId,session,reservationId,passengerId,shipCode,sailDate,numberOfNights,cruiseLineCode)
         
-def getProducts(access_token,accountId,session,reservationId,passengerId,ship,startDate,cruiseLineCode,productList,currencyCode):
+def getProducts(access_token,accountId,session,reservationId,passengerId,ship,startDate,cruiseLineCode,productList):
 
     headers = {
         'Host': 'aws-prd.api.rccl.com',
@@ -150,6 +170,7 @@ def getProducts(access_token,accountId,session,reservationId,passengerId,ship,st
 
     redFill = PatternFill(start_color='00FF0000', end_color='00FF0000', fill_type='solid')
     greenFill = PatternFill(start_color='0000FF00', end_color='0000FF00', fill_type='solid')
+    priceFmt = excel_currency_format(currencyCode,localeCode)
 
     sheet = workbook.create_sheet(shName, 0)
     workbook.active = workbook[shName]
@@ -161,8 +182,10 @@ def getProducts(access_token,accountId,session,reservationId,passengerId,ship,st
     sheet.column_dimensions['A'].width = 20
     sheet.column_dimensions['B'].width = 53
     sheet.column_dimensions['C'].width = 12
+    sheet.column_dimensions['D'].width = 12
     sheet.column_dimensions['E'].width = 20
     sheet.column_dimensions['F'].width = 33
+    sheet.column_dimensions['H'].width = 12
 
     for product in productList:
 
@@ -224,36 +247,36 @@ def getProducts(access_token,accountId,session,reservationId,passengerId,ship,st
                 if len(item["variantIdList"]) > 1:
                     # There are variants. Add row for each
                     for optn in item["variantIdList"]:
-                        variant = getVariant(access_token,accountId,session,reservationId,passengerId,ship,startDate,product,optn,currencyCode)
+                        variant = getVariant(access_token,accountId,session,reservationId,passengerId,ship,startDate,product,optn)
                         sheet.append([category, item["title"] + " - " + variant["description"], variant["msrp"], variant["price"], displayUnit, variant["promoDescription"], variant["promotionValue"], variant["discountedValue"]])
-                        sheet.cell(row=currow, column=3).number_format = '"$"#,##0.00'
-                        sheet.cell(row=currow, column=4).number_format = '"$"#,##0.00'
+                        sheet.cell(row=currow, column=3).number_format = priceFmt
+                        sheet.cell(row=currow, column=4).number_format = priceFmt
                         sheet.cell(row=currow, column=7).number_format = FORMAT_PERCENTAGE
-                        sheet.cell(row=currow, column=8).number_format = '"$"#,##0.00'
+                        sheet.cell(row=currow, column=8).number_format = priceFmt
                         for element in compPrice:
                             if element["key"] == category + "|" + item["title"] and element["msrp"] == item["msrpAdultPrice"]:
                                 if item["lowestAdultPrice"] > element["price"]:
                                     sheet.cell(row=currow, column=4).fill = redFill
-                                    print(cruiseLineCode, reservationId, "Price increase:", category, item["title"], "from ${:0,.2f}".format(element["price"]), "to ${:0,.2f}".format(item["lowestAdultPrice"]))
+                                    print(cruiseLineCode, reservationId, "Price increase:", category, item["title"], "from", format_money(element["price"], currencyCode, localeCode), "to", format_money(element["lowestAdultPrice"], currencyCode, localeCode))
                                 elif item["lowestAdultPrice"] < element["price"]:
                                     sheet.cell(row=currow, column=4).fill = greenFill
-                                    print(cruiseLineCode, reservationId, "Price decrease:", category, item["title"], "from ${:0,.2f}".format(element["price"]), "to ${:0,.2f}".format(item["lowestAdultPrice"]))
+                                    print(cruiseLineCode, reservationId, "Price decrease:", category, item["title"], "from", format_money(element["price"], currencyCode, localeCode), "to", format_money(element["lowestAdultPrice"], currencyCode, localeCode))
                                 break
                         currow += 1
                 else:
                     sheet.append([category, item["title"], item["msrpAdultPrice"], item["lowestAdultPrice"], displayUnit, displayName, promotionValue, discountedValue])
-                    sheet.cell(row=currow, column=3).number_format = '"$"#,##0.00'
-                    sheet.cell(row=currow, column=4).number_format = '"$"#,##0.00'
+                    sheet.cell(row=currow, column=3).number_format = priceFmt
+                    sheet.cell(row=currow, column=4).number_format = priceFmt
                     sheet.cell(row=currow, column=7).number_format = FORMAT_PERCENTAGE
-                    sheet.cell(row=currow, column=8).number_format = '"$"#,##0.00'
+                    sheet.cell(row=currow, column=8).number_format = priceFmt
                     for element in compPrice:
                         if element["key"] == category + "|" + item["title"] and element["msrp"] == item["msrpAdultPrice"]:
                             if item["lowestAdultPrice"] > element["price"]:
                                 sheet.cell(row=currow, column=4).fill = redFill
-                                print(cruiseLineCode, reservationId, "Price increase:", category, item["title"], "from ${:0,.2f}".format(element["price"]), "to ${:0,.2f}".format(item["lowestAdultPrice"]))
+                                print(cruiseLineCode, reservationId, "Price increase:", category, item["title"], "from", format_money(element["price"], currencyCode, localeCode), "to", format_money(item["lowestAdultPrice"], currencyCode, localeCode))
                             elif item["lowestAdultPrice"] < element["price"]:
                                 sheet.cell(row=currow, column=4).fill = greenFill
-                                print(cruiseLineCode, reservationId, "Price decrease:", category, item["title"], "from ${:0,.2f}".format(element["price"]), "to ${:0,.2f}".format(item["lowestAdultPrice"]))
+                                print(cruiseLineCode, reservationId, "Price decrease:", category, item["title"], "from", format_money(element["price"], currencyCode, localeCode), "to", format_money(item["lowestAdultPrice"], currencyCode, localeCode))
                             break
                     currow += 1
 
@@ -261,7 +284,7 @@ def getProducts(access_token,accountId,session,reservationId,passengerId,ship,st
     workbook.save(wbName)
     workbook.close()
 
-def getOrders(access_token,accountId,session,reservationId,passengerId,ship,startDate,numberOfNights,currencyCode):
+def getOrders(access_token,accountId,session,reservationId,passengerId,ship,startDate,numberOfNights,cruiseLineCode):
     
     headers = {
         'Access-Token': access_token,
@@ -273,7 +296,6 @@ def getOrders(access_token,accountId,session,reservationId,passengerId,ship,star
         'passengerId': passengerId,
         'reservationId': reservationId,
         'sailingId': ship + startDate,
-        'currencyIso': currencyCode,
         'includeMedia': 'false',
     }
     
@@ -286,7 +308,6 @@ def getOrders(access_token,accountId,session,reservationId,passengerId,ship,star
     # Check for my orders and orders others booked for me
     for order in response.json().get("payload").get("myOrders") + response.json().get("payload").get("ordersOthersHaveBookedForMe"):
         orderCode = order.get("orderCode")
-        
         # Only get Valid Orders That Cost Money
         if order.get("orderTotals").get("total") > 0: 
             
@@ -302,15 +323,24 @@ def getOrders(access_token,accountId,session,reservationId,passengerId,ship,star
                 if orderDetail.get("guests")[0].get("orderStatus") == "CANCELLED":
                     continue
                 order_title = orderDetail.get("productSummary").get("title")
-                product = orderDetail.get("productSummary").get("baseId")
+                product = orderDetail.get("productSummary").get("id")
+                altProduct = None
+                if orderDetail.get("productSummary").get("baseId") and orderDetail.get("productSummary").get("baseId") != product:
+                    altProduct = orderDetail.get("productSummary").get("baseId")
+                if orderDetail.get("id") and orderDetail.get("id") != altProduct:
+                    altProduct = orderDetail.get("id")
                 prefix = orderDetail.get("productSummary").get("productTypeCategory").get("id")
+                paidCurrency = orderDetail.get("guests")[0].get("priceDetails").get("currency")
+                paidLocale = localeCode
+                if paidCurrency != currencyCode:
+                    paidLocale = CURRENCY_TO_LOCALE.get(paidCurrency, "en_US")
                 paidPrice = orderDetail.get("guests")[0].get("priceDetails").get("subtotal")
                 # These packages report total price, must divide by number of days
                 if orderDetail.get("productSummary").get("salesUnit") in [ 'PER_NIGHT', 'PER_DAY' ]:
                    paidPrice = round(paidPrice / numberOfNights,2)
-                getCurrentPrice(access_token,accountId,session,reservationId,passengerId,ship,startDate,prefix,paidPrice,product,currencyCode)
+                getCurrentPrice(access_token,accountId,session,reservationId,passengerId,ship,startDate,prefix,paidPrice,paidCurrency,paidLocale,product,altProduct,cruiseLineCode)
 
-def getCurrentPrice(access_token,accountId,session,reservationId,passengerId,ship,startDate,prefix,paidPrice,product,currencyCode):    
+def getCurrentPrice(access_token,accountId,session,reservationId,passengerId,ship,startDate,prefix,paidPrice,paidCurrency,paidLocale,product,altProduct,cruiseLineCode):    
     
     headers = {
         'Access-Token': access_token,
@@ -322,7 +352,7 @@ def getCurrentPrice(access_token,accountId,session,reservationId,passengerId,shi
         'reservationId': reservationId,
         'startDate': startDate,
         'passengerId': passengerId,
-        'currencyIso': currencyCode,
+        'currencyIso': paidCurrency,
     }
 
     response = session.get(
@@ -333,10 +363,12 @@ def getCurrentPrice(access_token,accountId,session,reservationId,passengerId,shi
     
     title = "Product code: " + product
     currentPrice = None
+    text = cruiseLineCode + " " + reservationId + ": "
 
     if response.status_code == 200:
         try:
-            title = response.json().get("payload").get("title")
+            if response.json().get("payload").get("title"):
+                title = response.json().get("payload").get("title")
             currentPrice = response.json().get("payload").get("startingFromPrice").get("adultPromotionalPrice")
             if not currentPrice:
                 currentPrice = response.json().get("payload").get("startingFromPrice").get("adultShipboardPrice")
@@ -344,19 +376,22 @@ def getCurrentPrice(access_token,accountId,session,reservationId,passengerId,shi
             pass
     
     if currentPrice:
-        text = reservationId + ": " + title + " - Paid price: {:0,.2f}".format(paidPrice) + " Current price: {:0,.2f}".format(currentPrice)
+        text += title + " - Paid price: " + format_money(paidPrice, paidCurrency, paidLocale) + " Current price: " + format_money(currentPrice, paidCurrency, paidLocale)
         if currentPrice < paidPrice:
-            text += " - DOWN {:0,.2f}".format(paidPrice - currentPrice)
+            text += " - DOWN " + format_money(paidPrice - currentPrice, paidCurrency, paidLocale) 
         elif currentPrice > paidPrice:
-            text += " - UP {:0,.2f}".format(currentPrice - paidPrice)
+            text += " - UP " + format_money(currentPrice - paidPrice, paidCurrency, paidLocale)
         else:
             text += " - unchanged"
     else:
-        text = reservationId + ": " + title + " - Paid price: {:0,.2f}".format(paidPrice) + " Current price not available."
+        if altProduct is not None:
+            getCurrentPrice(access_token,accountId,session,reservationId,passengerId,ship,startDate,prefix,paidPrice,paidCurrency,paidLocale,altProduct,None,cruiseLineCode)
+            return
+        text += title + " - Paid price: " + format_money(paidPrice, paidCurrency, paidLocale) + " Current price not available. Product code: " + product + f" Alt product: {altProduct}" if altProduct else ""
 
     print(text)
 
-def getVariant(access_token,accountId,session,reservationId,passengerId,ship,startDate,prefix,product,currencyCode):    
+def getVariant(access_token,accountId,session,reservationId,passengerId,ship,startDate,prefix,product):    
     
     variant = { 'product': product, 'description': '', 'price': None, 'msrp': None, 'promotionValue': None, 'discountedValue': None, 'promoDescription': 'None' }
 
@@ -393,6 +428,15 @@ def getVariant(access_token,accountId,session,reservationId,passengerId,ship,sta
             pass
 
     return variant
+
+def excel_currency_format(currency, locale):
+    symbol = get_currency_symbol(currency, locale=locale)
+    decimals = get_currency_precision(currency)
+    decimal_part = "." + ("0" * decimals) if decimals else ""
+    return f'"{symbol}"#,##0{decimal_part}'
+
+def format_money(amount, currency, locale):
+    return format_currency(amount, currency, locale=locale)
 
 if __name__ == "__main__":
     main()

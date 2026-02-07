@@ -153,8 +153,10 @@ def get_cruise_price(timestamp, url, compPrice, cruiseLineName, iteration = 0):
     if addNewColumn:
         x = sheet.max_column + 1
         sheet.cell(row=1, column=x).value = group
-        sheet.cell(row=2, column=x).value = currentPrice # Set base price
+        sheet.cell(row=2, column=x).value = compPrice # Set base price (from .yaml file)
         sheet.column_dimensions[get_column_letter(x)].width = 40
+    else:
+        sheet.cell(row=2, column=x).value = compPrice # Set price (may have changed in .yaml file)
 
     sheet.cell(row=i, column=x).value = currentPrice
     sheet.cell(row=i, column=x).number_format = '"$"##,##0.00'

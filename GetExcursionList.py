@@ -2,22 +2,25 @@ import requests
 import yaml
 from datetime import datetime
 from urllib.parse import urlparse, parse_qs
-import re
+import os
 import base64
 import json
 import openpyxl
 from openpyxl.styles import Alignment
 from openpyxl.styles.numbers import FORMAT_PERCENTAGE
 import argparse
+from babel.numbers import get_currency_precision, get_currency_symbol, format_currency
 
 appKey = "qpRMO6lj4smwkT1sWlSdIj7b8QF5rG8Q"
 cruiselines = []
 cruiselines.append({"lineName": "royalcaribbean", "lineCode": "R", "linePretty": "Royal Caribbean"})
 cruiselines.append({"lineName": "celebritycruises", "lineCode": "C", "linePretty": "Celebrity"})
+currencyCode = 'USD'
+localeCode = 'en_US'
 
 def main():
-    global cruiseLineName
-    global cruiseLineCode
+    global cruiseLineName, cruiseLineCode
+    global currencyCode, localeCode
 
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     print(timestamp)
@@ -33,19 +36,20 @@ def main():
     with open('config.yaml', 'r') as file:
         data = yaml.safe_load(file)
         
-        currencyCode = 'USD'
         if 'currency' in data:
             currencyCode = data['currency']
+        if 'locale' in data:
+            localeCode = data['locale']
 
         if 'accountInfo' in data:
             for accountInfo in data['accountInfo']:
                 username = accountInfo['username']
                 password = accountInfo['password']
-                print(username, "Currency:", currencyCode) 
+                print(username, "Currency:", currencyCode, "Locale:", localeCode) 
                 session = requests.session()
                 for cruiseline in cruiselines:
                     access_token,accountId,session = login(username,password,session,cruiseline['lineName'])
-                    getVoyages(bookingID, access_token,accountId,session,cruiseline['lineCode'],currencyCode)
+                    getVoyages(bookingID, access_token,accountId,session,cruiseline['lineCode'])
             
 def login(username,password,session,cruiseLineName):
     headers = {
@@ -71,7 +75,7 @@ def login(username,password,session,cruiseLineName):
     accountId = auth_info["sub"]
     return access_token,accountId,session
 
-def getVoyages(bookingID,access_token,accountId,session,cruiseLineCode,currencyCode):
+def getVoyages(bookingID,access_token,accountId,session,cruiseLineCode):
 
     headers = {
         'Access-Token': access_token,
@@ -98,9 +102,9 @@ def getVoyages(bookingID,access_token,accountId,session,cruiseLineCode,currencyC
         sailDate = booking.get("sailDate")
         numberOfNights = booking.get("numberOfNights")
         shipCode = booking.get("shipCode")
-        getProducts(access_token,accountId,session,reservationId,passengerId,shipCode,sailDate,cruiseLineCode,currencyCode)
+        getProducts(access_token,accountId,session,reservationId,passengerId,shipCode,sailDate,cruiseLineCode)
         
-def getProducts(access_token,accountId,session,reservationId,passengerId,ship,startDate,cruiseLineCode,currencyCode):
+def getProducts(access_token,accountId,session,reservationId,passengerId,ship,startDate,cruiseLineCode):
 
     headers = {
         'Host': 'aws-prd.api.rccl.com',
@@ -157,8 +161,16 @@ def getProducts(access_token,accountId,session,reservationId,passengerId,ship,st
         print(response.json())
         quit()
 
-    workbook = openpyxl.Workbook()
-    sheet = workbook.active
+    wbName = cruiseLineCode+"-"+reservationId+"-shorex-"+currencyCode+".xlsx"
+    shName = str(datetime.now().strftime("%Y-%m-%d (%H %M)"))
+
+    if os.path.isfile(wbName):
+        workbook = openpyxl.load_workbook(wbName)
+    else:
+        workbook = openpyxl.Workbook()
+
+    sheet = workbook.create_sheet(shName, 0)
+    workbook.active = workbook[shName]
     currow = 2 # Header is row 1
 
     sheet.append(["Link", "Day", "Title", "Port", "Time", "Duration", "Price", "Promotion", "Description" ])
@@ -178,7 +190,7 @@ def getProducts(access_token,accountId,session,reservationId,passengerId,ship,st
         getURL = 'https://aws-prd.api.rccl.com//en/celebrity/web/commerce-api/catalog/v2/'+ship+'/categories/pt_shoreX/products/'+excursion["id"]+'?reservationId='+reservationId+'&passengerId='+passengerId+'&startDate='+startDate+'&currencyIso='+currencyCode
 
         detail = session.get(getURL, headers=headers)
-
+        
         if detail.status_code != 200:
             print("getProducts - Status:" + str(detail.status_code) + " Quitting")
             print(detail.json())
@@ -207,14 +219,23 @@ def getProducts(access_token,accountId,session,reservationId,passengerId,ship,st
                     sheet.cell(row=currow, column=5).number_format = 'h:mm AM/PM'
                 else:
                     sheet.cell(row=currow, column=5).value = ""
-                sheet.cell(row=currow, column=7).number_format = '"$"#,##0.00'
+                sheet.cell(row=currow, column=7).number_format = excel_currency_format(currencyCode,localeCode)
                 for col in range(1, sheet.max_column+1):
                     sheet.cell(row=currow, column=col).alignment = Alignment(vertical='top')
                 sheet.cell(row=currow, column=9).alignment = Alignment(wrap_text=True,vertical='top')
                 currow += 1
 
     sheet.freeze_panes = 'A2'
-    workbook.save(cruiseLineCode+"-"+reservationId+"-shorex-"+currencyCode+".xlsx")
+    workbook.save(wbName)
+
+def excel_currency_format(currency, locale):
+    symbol = get_currency_symbol(currency, locale=locale)
+    decimals = get_currency_precision(currency)
+    decimal_part = "." + ("0" * decimals) if decimals else ""
+    return f'"{symbol}"#,##0{decimal_part}'
+
+def format_money(amount, currency, locale):
+    return format_currency(amount, currency, locale=locale)
 
 if __name__ == "__main__":
     main()

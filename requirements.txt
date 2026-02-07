@@ -2,3 +2,4 @@ Apprise
 bs4
 pyinstaller
 openpyxl
+babel
