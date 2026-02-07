@@ -13,7 +13,6 @@ import locale
 appKey = "hyNNqIPHHzaLzVpcICPdAdbFV8yvTsAm"
 
 currencyOverride = ""
-minimumSavingAlert = None
 
 foundItems = []
 
@@ -27,6 +26,8 @@ RESET = '\033[0m' # Resets color to default
 dateDisplayFormat = "%x"  # Uses the locale date format unless overridden by config
 
 shipDictionary = {}
+
+
 
 def main():
     parser = argparse.ArgumentParser(description="Check Royal Caribbean Price")
@@ -67,11 +68,6 @@ def main():
             global currencyOverride
             currencyOverride = data['currencyOverride']
             print(YELLOW + "Overriding Current Price Currency to " + currencyOverride + RESET)
-        
-        if 'minimumSavingAlert' in data:
-            global minimumSavingAlert
-            minimumSavingAlert = float(data['minimumSavingAlert'])
-            print(YELLOW + "Only alerting for savings >= " + str(minimumSavingAlert) + RESET)
 
         global shipDictionary
         shipDictionary = getShipDictionary()
@@ -114,38 +110,6 @@ def main():
                     paidPrice = float(cruises['paidPrice'])
                     get_cruise_price(cruiseURL, paidPrice, apobj, False)
             
-
-def string_to_float(s: str) -> float:
-    s = s.strip()
-
-    if "," in s and "." in s:
-        # Both present → last one is decimal separator
-        if s.rfind(",") > s.rfind("."):
-            # European: 1.234,56
-            s = s.replace(".", "").replace(",", ".")
-        else:
-            # American: 1,234.56
-            s = s.replace(",", "")
-    elif "," in s:
-        # Only comma present
-        parts = s.split(",")
-        if len(parts[-1]) == 3 and parts[-1].isdigit():
-            # 4,000 → thousands
-            s = s.replace(",", "")
-        else:
-            # 4,0 → decimal
-            s = s.replace(",", ".")
-    elif "." in s:
-        # Only dot present
-        parts = s.split(".")
-        if len(parts[-1]) == 3 and parts[-1].isdigit():
-            # 4.000 → thousands
-            s = s.replace(".", "")
-        # else: 4.0 or 4.00 → decimal → keep dot
-    # else: plain integer
-
-    return float(s)
-
 
 def aboveTwelveOnSailDate(birthDate, sailDate):
     dt1 = datetime.strptime(birthDate, "%Y%m%d")
@@ -262,10 +226,10 @@ def getInCartPricePrice(access_token,accountId,session,reservationId,ship,startD
         price = payload.get("prices")[0].get("promoDailyPrice")
     else:
         price = payload.get("prices")[0].get("promoPrice")
-
+        
     print("Paid Price: " + str(paidPrice) + " Cart Price: " + str(price))
     
-def getNewBeveragePrice(access_token,accountId,session,reservationId,ship,startDate,prefix,paidPrice,currency,product,apobj, passengerId,guestAgeString,passengerName,room, orderCode, orderDate, owner, forWatch, cruiseLineName, salesUnit=None, numberOfNights=None):
+def getNewBeveragePrice(access_token,accountId,session,reservationId,ship,startDate,prefix,paidPrice,currency,product,apobj, passengerId,passengerName,room, orderCode, orderDate, owner, forWatch, cruiseLineName):
     
     headers = {
         'Access-Token': access_token,
@@ -288,11 +252,11 @@ def getNewBeveragePrice(access_token,accountId,session,reservationId,ship,startD
         params=params,
         headers=headers,
     )
-
+    
     payload = response.json().get("payload")
     if payload is None:
         return
-
+    
     title = payload.get("title")    
     variant = ""
     try:
@@ -303,49 +267,24 @@ def getNewBeveragePrice(access_token,accountId,session,reservationId,ship,startD
     if "Bottles" in variant:
         title = title + " (" + variant + ")"
     
-    perDayPrice = salesUnit in [ 'PER_NIGHT', 'PER_DAY' ]
-    
     newPricePayload = payload.get("startingFromPrice")
     
     if newPricePayload is None:
         if not forWatch:
-            tempString = YELLOW + passengerName.ljust(10) + " (" + room + ") has best price " 
-            if perDayPrice:
-                tempString += "per night "
-            tempString += "for " + title +  " of: " + str(paidPrice) + " " + currency + " (No Longer for Sale)" + RESET
+            tempString = YELLOW + passengerName.ljust(10) + " (" + room + ") has best price for " + title +  " of: " + str(paidPrice) + " (No Longer for Sale)" + RESET
             print(tempString)
         return
-    
-    # This should pull correct infant, child, or adult price
-    currentPrice = newPricePayload.get(guestAgeString + "PromotionalPrice")
-    if not currentPrice:
-        currentPrice = newPricePayload.get(guestAgeString + "ShipboardPrice")
-    # Infant price is often None, this just sets to 0 to avoid error
-    # Should never happend since should not check prices that are 0 to begin with
+        
+    currentPrice = newPricePayload.get("adultPromotionalPrice")
     
     if not currentPrice:
-        currentPrice = 0
+        currentPrice = newPricePayload.get("adultShipboardPrice")
     
     if currentPrice < paidPrice:
-        saving = round(paidPrice - currentPrice, 2)
-        savingForAlert = saving
-        savingLabel = "Saving " + str(saving) + " " + currency
-        if perDayPrice and numberOfNights:
-            savingForAlert = round(saving * numberOfNights, 2)
-            savingLabel = "Saving " + str(saving) + " " + currency + " per night (" + str(savingForAlert) + " " + currency + " total)"
         if forWatch:
-            text = passengerName + ": Book! " + title + " Price "
-            if perDayPrice:
-                text += "per night "
-            text += "is lower: " + str(currentPrice) + " " + currency + " than " + str(paidPrice) + " " + currency
+            text = passengerName + ": Book! " + title + " Price is lower: " + str(currentPrice) + " than " + str(paidPrice)
         else:
-            text = passengerName + ": Rebook! " + title + " Price " 
-            if perDayPrice:
-                text += "per night "
-                
-            text += "is lower: " + str(currentPrice) + " " + currency+ " than " + str(paidPrice) + " " + currency
-        if minimumSavingAlert is not None:
-            text += " (" + savingLabel + ")"
+            text = passengerName + ": Rebook! " + title + " Price is lower: " + str(currentPrice) + " than " + str(paidPrice)
         
         promoDescription = payload.get("promoDescription")
         if promoDescription:
@@ -360,27 +299,18 @@ def getNewBeveragePrice(access_token,accountId,session,reservationId,ship,startD
         if not owner:
             text += " " + "This was booked by another in your party. They will have to cancel/rebook for you!"
             
-        if minimumSavingAlert is not None and savingForAlert < minimumSavingAlert:
-            text += " (" + savingLabel + " < minimumSavingAlert " + str(minimumSavingAlert) + "; no notification sent)"
-            print(YELLOW + text + RESET)
-        else:
-            print(RED + text + RESET)
-            apobj.notify(body=text, title='Cruise Addon Price Alert')
+        print(RED + text + RESET)
+        apobj.notify(body=text, title='Cruise Addon Price Alert')
     else:
         if forWatch:
-            tempString = GREEN + passengerName.ljust(10) + " (" + title +  ") price "
-            if perDayPrice:
-                tempString += "per night "
-            tempString += "is higher than watch price: " + str(paidPrice) + " " + currency + RESET
+            tempString = GREEN + passengerName.ljust(10) + " (" + title +  ") price is higher than watch price: " + str(paidPrice) + RESET
         else:
-            tempString = GREEN + passengerName.ljust(10) + " (" + room + ") has best price "
-            if perDayPrice:
-                tempString += "per night "
-            tempString += "for " + title +  " of: " + str(paidPrice) + " " + currency + RESET
+            tempString = GREEN + passengerName.ljust(10) + " (" + room + ") has best price for " + title +  " of: " + str(paidPrice) + RESET
         if currentPrice > paidPrice:
-            tempString += " (now " + str(currentPrice) + " " + currency + ")"
+            tempString += " (now " + str(currentPrice) + ")"
         print(tempString)
         
+    
 
 def processWatchListForBooking(access_token, accountId, session, reservationId, ship, startDate, passengerId, passengerName, room, watchListItems, apobj, cruiseLineName):
     """
@@ -395,15 +325,7 @@ def processWatchListForBooking(access_token, accountId, session, reservationId, 
         prefix = watchItem.get('prefix')
         watchPrice = float(watchItem.get('price', 0))
         enabled = watchItem.get('enabled', True)  # Default to True if not specified
-        guestAgeString = (watchItem.get('guestAgeString',"adult")).lower()
-        currency = watchItem.get('currency',"USD")
         
-        reservationList = watchItem.get('reservations',None)
-        
-        if reservationList:
-            if reservationId not in reservationList:
-                continue
-            
         # Skip disabled watchlist items
         if not enabled:
             continue
@@ -418,8 +340,8 @@ def processWatchListForBooking(access_token, accountId, session, reservationId, 
         # Set placeholder values for order-specific fields since these aren't actual orders
         getNewBeveragePrice(
             access_token, accountId, session, reservationId, ship, startDate,
-            prefix, watchPrice, currency, product, apobj, passengerId,guestAgeString,
-            watchDisplayName, room, "WATCH-LIST", "Watch List", True, True, cruiseLineName, None, None
+            prefix, watchPrice, "USD", product, apobj, passengerId,
+            watchDisplayName, room, "WATCH-LIST", "Watch List", True, True, cruiseLineName
         )
 
 def getLoyalty(access_token,accountId,session):
@@ -480,19 +402,20 @@ def getVoyages(access_token,accountId,session,apobj,cruiseLineName,reservationFr
     )
 
     for booking in response.json().get("payload").get("profileBookings"):
+        print(booking)
         reservationId = booking.get("bookingId")
         passengerId = booking.get("passengerId")
         sailDate = booking.get("sailDate")
         numberOfNights = booking.get("numberOfNights")
         shipCode = booking.get("shipCode")
-        guests = booking.get("passengersInStateroom")
+        guests = booking.get("passengers")
         packageCode = booking.get("packageCode")
         bookingCurrency = booking.get("bookingCurrency")
         bookingOfficeCountryCode = booking.get("bookingOfficeCountryCode")
         stateroomType = booking.get("stateroomType")
         stateroomNumber = booking.get("stateroomNumber")
         
-        stateroomTypeName = "NONE"
+        stateroomTypeName = "INTERIOR"
         
         if stateroomType == "I":
             stateroomTypeName = "INTERIOR"
@@ -516,7 +439,7 @@ def getVoyages(access_token,accountId,session,apobj,cruiseLineName,reservationFr
             birthDate = guest.get("birthdate")
             
             isAdult = aboveTwelveOnSailDate(birthDate, sailDate)
-        
+            
             if isAdult:
                 numberOfAdults = numberOfAdults + 1
             else:
@@ -533,12 +456,11 @@ def getVoyages(access_token,accountId,session,apobj,cruiseLineName,reservationFr
             reservationDisplay += " (" + reservationFriendlyNames.get(str(reservationId)) + ")"
         sailDateDisplay = datetime.strptime(sailDate, "%Y%m%d").strftime(dateDisplayFormat)
         print(reservationDisplay + ": " + sailDateDisplay + " " + shipDictionary[shipCode] + " Room " + stateroomNumber + " (" + passengerNames + ")")
-
-        # testing shows OBC is returned for each passenger, but really only for the stateroom
-        GetOBC(access_token,accountId,session,reservationId,passengerId,shipCode,sailDate,numberOfNights,apobj,cruiseLineName,bookingCurrency)
+        
         
         # Print Current Prices
         if displayCruisePrices:
+            #GetCruisePriceFromAPI(bookingCurrency, packageCode, sailDate,stateroomType, numberOfAdults, numberOfChildren)
         
             urlSailDate = f"{sailDate[0:4]}-{sailDate[4:6]}-{sailDate[6:8]}"
        
@@ -551,16 +473,11 @@ def getVoyages(access_token,accountId,session,apobj,cruiseLineName,reservationFr
             #print(cruisePriceURL)
             if str(reservationId) in reservationPricePaid:
                 paidPrice = float(reservationPricePaid.get(str(reservationId)))
-            
-            if stateroomType != "NONE":
-                get_cruise_price(cruisePriceURL, paidPrice, apobj, True, 0)
-            else:
-                print(YELLOW + "         Cannot Check Cruise Price - Use Manual URL Method" + RESET)
+                
+            get_cruise_price(cruisePriceURL, paidPrice, apobj, True, 0)
         
         if booking.get("balanceDue") is True:
             print(YELLOW + reservationDisplay + ": " + "Remaining Cruise Payment Balance is " + str(booking.get("balanceDueAmount")) + RESET)
-        
-        
         
         getOrders(access_token,accountId,session,reservationId,passengerId,shipCode,sailDate,numberOfNights,apobj,cruiseLineName)
         print(" ")
@@ -605,7 +522,7 @@ def getOrders(access_token,accountId,session,reservationId,passengerId,ship,star
         params=params,
         headers=headers,
     )
-    
+ 
     # Check for my orders and orders others booked for me
     for order in response.json().get("payload").get("myOrders") + response.json().get("payload").get("ordersOthersHaveBookedForMe"):
         orderCode = order.get("orderCode")
@@ -632,9 +549,7 @@ def getOrders(access_token,accountId,session,reservationId,passengerId,ship,star
                 order_title = orderDetail.get("productSummary").get("title")
                 
                 #product = orderDetail.get("productSummary").get("id")
-                #product = orderDetail.get("productSummary").get("baseId")
-                # API Change on 6 Feb 2026
-                product = orderDetail.get("productSummary").get("defaultVariantId")
+                product = orderDetail.get("productSummary").get("baseId")
                 prefix = orderDetail.get("productSummary").get("productTypeCategory").get("id")
               
                 salesUnit = orderDetail.get("productSummary").get("salesUnit")
@@ -654,7 +569,6 @@ def getOrders(access_token,accountId,session,reservationId,passengerId,ship,star
                     passengerId = guest.get("id")
                     firstName = guest.get("firstName").capitalize()
                     reservationId = guest.get("reservationId")
-                    guestAgeString = guest.get("guestType").lower()
                     
                     # Skip if item checked already
                     newKey = passengerId + reservationId + prefix + product
@@ -673,7 +587,7 @@ def getOrders(access_token,accountId,session,reservationId,passengerId,ship,star
                     room = guest.get("stateroomNumber") 
                     #getInCartPricePrice(access_token,accountId,session,reservationId,ship,startDate,prefix,quantity,paidPrice,currency,product,apobj, guest,passengerId,firstName,room,orderCode,orderDate,owner)
                     
-                    getNewBeveragePrice(access_token,accountId,session,reservationId,ship,startDate,prefix,paidPrice,currency,product,apobj, passengerId,guestAgeString,firstName,room,orderCode,orderDate,owner,False,cruiseLineName, salesUnit, numberOfNights)
+                    getNewBeveragePrice(access_token,accountId,session,reservationId,ship,startDate,prefix,paidPrice,currency,product,apobj, passengerId,firstName,room,orderCode,orderDate,owner,False,cruiseLineName)
 
 def get_cruise_price(url, paidPrice, apobj, automaticURL,iteration = 0):
     
@@ -717,6 +631,10 @@ def get_cruise_price(url, paidPrice, apobj, automaticURL,iteration = 0):
     stateroomSubtype = params.get("r0e")[0]
     stateroomCategoryCode = params.get("r0f")[0]
     
+    # Change URL
+    if stateroomCategoryCode is None:
+        stateroomCategoryCode = stateroomSubtype
+    
     preString = "         " + sailDateDisplay + " " + shipName + " " + cabinClassString + " " + stateroomCategoryCode
     
     packageCode = params.get("packageCode")[0]
@@ -747,8 +665,7 @@ def get_cruise_price(url, paidPrice, apobj, automaticURL,iteration = 0):
     if params.get("groupId") is not None:
         groupID = params.get("groupId")[0]
         part = groupID[2:4]
-    
-    packageCode = None
+        
     if params.get("packageCode") is not None:
         packageCode = params.get("packageCode")[0]
         part = packageCode[2:4]
@@ -776,13 +693,7 @@ def get_cruise_price(url, paidPrice, apobj, automaticURL,iteration = 0):
         # If you specified the URL, provide a notification to update the URL
         if not automaticURL:
             apobj.notify(body=textString, title='Cruise Room Not Available')
-        
-        # If cruise room not available, print other room prices
-        # Only do this for watchlist rooms
-        if packageCode and not automaticURL:
-            GetCruisePriceFromAPI(currencyCode, packageCode, sailDate, cabinClassString, numberOfAdults, numberOfChildren)
         return
-        
 
     if soupFind is None:
         textString = preString + " No Longer Available To Book"
@@ -791,73 +702,46 @@ def get_cruise_price(url, paidPrice, apobj, automaticURL,iteration = 0):
         return
     
     priceString = soupFind.text
-    # Extract Numbers from String. Should handle all currency
-    numbers = re.findall(r"[+-]?\d[\d.,]*", priceString)
-    if numbers:
-        price = string_to_float(numbers[0])
+    if currencyCode == "DKK":
+        priceString = priceString.replace(".", "")
+        priceString = priceString.replace(",", ".")
+        m = re.search("(.*)" + "kr", priceString)
+    elif currencyCode == "GBP": 
+        priceString = priceString.replace(",", "")
+        m = re.search("\\£(.*)" + currencyCode, priceString)
     else:
-        price = None
+        priceString = priceString.replace(",", "")
+        m = re.search("\\$(.*)" + currencyCode, priceString)
+    
+    priceOnlyString = m.group(1)
+    price = float(priceOnlyString)
     
     if paidPrice is None:
-        tempString = GREEN + preString + ": Current Price " + str(price) + " " + currencyCode + RESET
+        tempString = GREEN + preString + ": Current Price " + str(price) + RESET
         print(tempString)
         return
     
-    # Find OBC and substract from price
-    obcFind = soup.find("p",attrs={"data-testid":"onboardcreditsbox-primary-label"})
-    obcValue = 0
-    if obcFind:
-        obcString = obcFind.find("span").get_text(strip=True)
-        obcValue = re.findall(r"[+-]?\d[\d.,]*", obcString)
-        if obcValue is None:
-            obcValue = 0
-        else:
-            obcValue = string_to_float(obcValue[0])
-            #price -= obcValue # not subtract because not in correct currency
-    
     if price < paidPrice: 
-        saving = round(paidPrice - price, 2)
         # Notify if should rebook
         if automaticURL and (daysBeforeCruise >= finalPaymentDeadline):
-            textString = "Rebook! " + preString + " New price of "  + str(price) + " " + currencyCode
-            if obcValue > 0:
-                textString += " not including " +  str(obcString) + " OBC"
-            textString += " is lower than " + str(paidPrice)
-            
-            if minimumSavingAlert is not None and saving < minimumSavingAlert:
-                textString += " (Saving " + str(saving) + " < minimumSavingAlert " + str(minimumSavingAlert) + "; no notification sent)"
-                print(YELLOW + textString + RESET)
-            else:
-                print(RED + textString + RESET)
-                apobj.notify(body=textString, title='Cruise Price Alert')
+            textString = "Rebook! " + preString + " New price of "  + str(price) + " is lower than " + str(paidPrice)
+            print(RED + textString + RESET)
+            apobj.notify(body=textString, title='Cruise Price Alert')
         # Don't notify if rebooking not possible
         if  automaticURL and (daysBeforeCruise < finalPaymentDeadline):
-            textString = "Past Final Payment Date " + preString + " New price of "  + str(price) + " " + currencyCode
-            if obcValue > 0:
-                textString += " not including " +  str(obcString) + " OBC"
-            textString += " is lower than " + str(paidPrice)
+            textString = "Past Final Payment Date " + preString + " New price of "  + str(price) + " is lower than " + str(paidPrice)
             print(YELLOW + textString + RESET)
             # Do not notify as no need!
             #apobj.notify(body=textString, title='Cruise Price Alert')
         # Always notify if URL is manually provided, assuming you have not booked it yet
         if not automaticURL:
-            textString = "Consider Booking! " + preString + " New price of "  + str(price) + " " + currencyCode
-            if obcValue > 0:
-                textString += " not including " +  str(obcString) + " OBC"
-            textString +=  " is lower than watchlist price of " + str(paidPrice)
-            if minimumSavingAlert is not None and saving < minimumSavingAlert:
-                textString += " (Saving " + str(saving) + " < minimumSavingAlert " + str(minimumSavingAlert) + "; no notification sent)"
-                print(YELLOW + textString + RESET)
-            else:
-                print(RED + textString + RESET)
-                apobj.notify(body=textString, title='Cruise Price Alert')
+            textString = "Consider Booking! " + preString + " New price of "  + str(price) + " is lower than watchlist price of " + str(paidPrice)
+            print(RED + textString + RESET)
+            apobj.notify(body=textString, title='Cruise Price Alert')
     else:
-        tempString = GREEN + preString + ": You have best price of " + str(paidPrice) + " " + currencyCode + RESET
+        tempString = GREEN + preString + ": You have best price of " + str(paidPrice) + RESET
         if price > paidPrice:
-            tempString += " (now " + str(price) + " " + currencyCode
-        if obcValue > 0:
-            tempString += " not including " +  str(obcString) + " OBC"
-        tempString += ")"   
+            tempString += " (now " + str(price) + ")"
         print(tempString)
 
 # Unused Functions
@@ -1122,21 +1006,14 @@ def GetCruisePriceFromAPI(currency, packageCode, sailDate, bookingType, numAdult
 
     resp = requests.post('https://www.royalcaribbean.com/cruises/graph', cookies=cookies, headers=headers, json=json_data)
 
-    
-    cruises = resp.json()["data"]["cruiseSearch"]["results"]["cruises"]
-    if cruises:
-        sailings = cruises[0]["sailings"]
-    else:
-        print("         Sailing is sold out")
-        return
-       
+
+    sailings = resp.json()["data"]["cruiseSearch"]["results"]["cruises"][0]["sailings"]
 
    
     for sailing in sailings:
-        
-        if sailing["sailDate"].replace("-", "") != sailDate and sailing["sailDate"] != sailDate:
+       
+        if sailing["sailDate"].replace("-", "") != sailDate:
             continue
-            
         prices = sailing["stateroomClassPricing"]
         for price in prices:
             cabinCode = price["stateroomClass"]["content"]["code"] 
@@ -1149,40 +1026,11 @@ def GetCruisePriceFromAPI(currency, packageCode, sailDate, bookingType, numAdult
             cabinType = price["stateroomClass"]["name"]
             
             if price["price"] is None:
-                print("         " + cabinType + " sold out")
+                print("         " + cabinType + " Not for sale")
             else:    
-                cabinCostPerPerson = float(price["price"]["value"]) * (int(numAdults) + int(numChildren))
-                print("         " + str(cabinCostPerPerson) + " " + currency + ": Cheapest " + cabinType + " Price " + "for " + str(int(numAdults) + int(numChildren)) + postString)
-
-def GetOBC(access_token,accountId,session,reservationId,passengerId,shipCode,sailDate,numberOfNights,apobj,cruiseLineName,currency):
-    
-    headers = {
-        'Access-Token': access_token,
-        'AppKey': appKey,
-        'Account-Id': accountId,
-    }
-        
-    params = {
-    'passengerId': passengerId,
-    'sailingId': shipCode + sailDate,
-    'currencyIso': currency,
-    }
-
-    response = requests.get(
-        'https://aws-prd.api.rccl.com/en/royal/web/commerce-api/cart/v1/obc/reservations/' + reservationId,
-        params=params,
-        headers=headers,
-    )
-
-    payload = response.json().get("payload")
-    if not payload:
-        return
-        
-    amount = payload.get("amount")
-    cur = payload.get("currencyIso")
-    
-    if amount and amount > 0:
-        print(f"         Onboard Credit of {amount} {cur}")
+                cabinCostPerPerson = float(price["price"]["value"]) * (numAdults + numChildren)
+                print("         " + str(cabinCostPerPerson) + " : Current Cheapest " + cabinType + " Price " + "for " + str(numAdults + numChildren) + postString)
+            
    
 
 if __name__ == "__main__":

@@ -2,12 +2,14 @@
 Checks if you have the cheapest price for your **Royal Caribbean** and **Celebrity Cruises** purchases (beverage packages, excursions, internet, etc.).  
 - ✅ Automatically checks your purchased packages (no need to enter them manually)  
 - ✅ Alerts you if a lower price is available
-- ✅ Finds deals specific to each passenger (loyalty or casino status, age-based or room specials) where other "royal" price trackers only find publicly available prices
+- ✅ Finds deals specific to each passenger (loyalty or casino status, age-based or room specials) where other "royal price trackers" only find publicly available (often higher) prices
 - ✅ Shows currently assigned cabin in Royal's backend system (*likely* the room you will get if purchased a GTY "We choose your room")
 - ✅ Shows the payment balance Royal's backend system thinks they are owed (does not include TA's take!)
 - ✅ Supports multiple Royal and Celebrity accounts or linked cruises
 - ✅ Handles all currencies (checks each item based on the currency used to purchase it)
-- ✅ Can also check **cabin prices** with just a booking URL (no login required)  
+- ✅ Can automatically check **cabin prices** for any cruise you booked
+- ✅ Can create a "watchlist" to check prices of items you have not purchased (thanks @jhedlund)  
+- ✅ Can also watchlist **cabin prices** with just a booking URL (no login required)  
 - ✅ Runs on Windows, macOS, Linux, Docker, iOS, and Home Assistant.
 - ✅ Completely open source, free to use or modify.
 - ✅ Separate `BrowseRoyalCaribbeanPrice.py` script lets you look up any cruise's addon prices, no setup required
@@ -32,7 +34,7 @@ If the code saved you money or correctly predicted your cabin number, star the r
    -   Note: if you make a text file in windows with New->Text file , it may look like it is named `config.yaml`, but it is actually named `config.yaml.txt` . In the windows file browser, go to View->Show and make sure "File Name Extensions" is checked. Then remove the .txt from the end of the file so it is actually named `config.yaml`.
 
 ## Install (iOS / iPhone - May work for Android too)
-This will run a stripped down version to work on the free Python iPhone app. As stripped down, it only supports excursion/drink packages etc. It does not support cruise fare price checks. It does not support apprise notifications, so you will have to watch the log to see any price drops. You need to edit the python file directly (directions below) because it does not use the config.yaml file. But allows you to check prices on the go, should work on the ship even without the internet package!
+This will run a stripped down version to work on the free Python iPhone app. As stripped down, it only supports excursion/drink packages etc. It does not support cruise fare price checks. It does not support apprise notifications, so you will have to watch the log to see any price drops. You need to edit the python file directly (directions below) because it does not use the config.yaml file. But allows you to check prices on the go. Works on the ship even *without* the internet package!
 
 1. Get Python From Appstore. `https://apps.apple.com/us/app/python-coding-editor-ide-app/id6444399635`
    -   Free version is fine, no need to make inapp purchases
@@ -98,14 +100,16 @@ services:
 The Docker container will run the price checker on the schedule you have defined.
 ## Edit Config File
 Create your `config.yaml` file with the below information. Feel free to copy the file `SAMPLE-config.yaml` to `config.yaml`. Edit `config.yaml` and place it in same directory as `CheckRoyalCaribbeanPrice.py` or `CheckRoyalCaribbeanPrice.exe` or when running `CheckRoyalCaribbeanPrice.py` provide the optional argument `-c path/to/config.yaml`.
-```
+```yaml
 accountInfo:
   - username: "user@gmail.com" # Your Royal Caribbean User Name
     password: "pa$$word" # Your Royal Caribbean Password (ensure no % in password)
   - username: "user@gmail.com" # Your Celebrity User Name
     password: "pa$$word" # Your Celebrity Password (ensure no % in password)
     cruiseLine: "celebrity" # Must indicate if celebrity
-cruises:
+displayCruisePrices: true # Optional, this will display current price for your booked cruises
+minimumSavingAlert: 0.00 # Optional, only alert when savings are >= this amount (per-night/per-day items use total savings per item)
+cruises: # Optional, this allows you to watch the price of a cruise you have not booked yet
   - cruiseURL: "https://www.royalcaribbean.com/checkout/guest-info?sailDate=2025-12-27&shipCode=VI&groupId=VI12BWI-753707406&packageCode=VI12L049&selectedCurrencyCode=USD&country=USA&cabinClassType=OUTSIDE&roomIndex=0&r0a=2&r0c=0&r0b=n&r0r=n&r0s=n&r0q=n&r0t=n&r0d=OUTSIDE&r0D=y&rgVisited=true&r0C=y&r0e=N&r0f=4N&r0g=BESTRATE&r0h=n&r0j=2138&r0w=2&r0B=BD&r0x=AF&r0y=6aa01639-c2d8-4d52-b850-e11c5ecf7146"
     paidPrice: "3833.74"
   - cruiseURL: "https://www.celebritycruises.com/checkout/guest-info?groupId=RF04FLL-1098868345&packageCode=RF4BH246&sailDate=2025-08-11&country=USA&selectedCurrencyCode=USD&shipCode=RF&cabinClassType=INTERIOR&category=I&roomIndex=0&r0a=2&r0c=0&r0b=n&r0r=n&r0s=n&r0q=n&r0t=n&r0d=OUTSIDE&r0D=y&rgVisited=true&r0C=y&r0e=Y&r0f=Y&r0g=BESTRATE&r0h=n&r0A=1127.6" # Can have as many URLS and price paid as you want. Supports Celebrity too
@@ -117,56 +121,124 @@ apprise:  # Optional, see https://github.com/caronc/apprise, can have as many li
 ```
 
 If you only want to check cruise addons (drink packages, excursions, etc) and do not want emails or check cruise prices, the config file is simpler. Start with this to see if works. You can have any number of Royal and/or Celebrity accounts:
-```
+```yaml
 accountInfo:
   - username: "user@gmail.com" # Your Royal Caribbean User Name
     password: "pa$$word" # Your Royal Caribbean Password (ensure no % in password)
     cruiseLine: "royal" or "celebrity" # This is optional and defaults to royal
 ```
 
-
-If you only want to check cruise price and do not want emails, the account information is not needed by the tool. Config file can look like this:
-
+To display current cabin prices for your **booked** cruise(s), set displayCruisePrices to true. This will request the current price from Royal's website. The code automatically determines the number of adults and children from your booking. So the price should be accurrate.  The script will not tell you if there is a loyality special, but will find any publically offered OBC and display it (but not subtract it because it only given in USD). The script will tell you if the cabin class (Interior, Balcony, Connecting Balcony, etc) you booked is no longer for sale, which means you cannot reprice. The script will also tell you if you are beyond the final payment date (75-120 days before departure depending on length of cruise), which also means you cannot reprice.
+```yaml
+accountInfo:
+  - username: "user@gmail.com" # Your Royal Caribbean User Name
+    password: "pa$$word" # Your Royal Caribbean Password (ensure no % in password)
+    cruiseLine: "royal" or "celebrity" # This is optional and defaults to royal
+displayCruisePrices: true
 ```
+If you want to compare cabin prices for your **booked** cruise(s), include the following info in your config, where XXXXXX and YYYYY are your reservation ID. The price can only have a `.` or `,` for the decimal place, do not use an indicator for thousands place. You must provide the price you paid as is not possible to look up via the API. Enter the price paid including taxes and subtract any OBC you received, but excluding any upgrades or gratuities. The code will identify if new booking has OBC and display it (but not subtract it since always give in USD). If price is lower and before the final payment date (even if you paid in full), do a mock booking on the website to confirm then call your travel agent. 
+```yaml
+accountInfo:
+  - username: "user@gmail.com" # Your Royal Caribbean User Name
+    password: "pa$$word" # Your Royal Caribbean Password (ensure no % in password)
+    cruiseLine: "royal" or "celebrity" # This is optional and defaults to royal
+displayCruisePrices: true
+reservationPricePaid:
+  'XXXXXX': 4568.48
+  'YYYYYY': 4172.71
+```
+If you only want to check cruise prices you have **not** booked yet and do not want email notifications, the account information is not needed by the tool. Config file can look like this:
+```yaml
 cruises:
   - cruiseURL: "https://www.royalcaribbean.com/checkout/guest-info?sailDate=2025-12-27&shipCode=VI&groupId=VI12BWI-753707406&packageCode=VI12L049&selectedCurrencyCode=USD&country=USA&cabinClassType=OUTSIDE&roomIndex=0&r0a=2&r0c=0&r0b=n&r0r=n&r0s=n&r0q=n&r0t=n&r0d=OUTSIDE&r0D=y&rgVisited=true&r0C=y&r0e=N&r0f=4N&r0g=BESTRATE&r0h=n&r0j=2138&r0w=2&r0B=BD&r0x=AF&r0y=6aa01639-c2d8-4d52-b850-e11c5ecf7146"
     paidPrice: "3833.74" 
 ```
 
-
 If you would like to assign names to cruise reservation numbers to more easily correlate which cruise is being displayed populate the following section:
-```
+```yaml
 reservationFriendlyNames:
   '1234567': "Summer Cruise"
   '8912345': "Winter Cruise
 ```
 
 To override the system's default date format, set the dateDisplayFormat config value to your desired format:
-```
+```yaml
 dateDisplayFormat: "%m/%d/%Y"
 ```
 
 To override the currency from what the API returns (what you bought the item in), set the currencyOverride config value to your desired currencyOverride. This should not be needed and should now only be needed for testing.
-```
+```yaml
 currencyOverride: 'DKK'
 ```
 
-## Get Cruise URL (Optional)
+To only alert when a price drop meets a minimum savings threshold, set minimumSavingAlert. For items priced per night/per day, the threshold compares against the total savings per item across the cruise. Use case is prices change fluctuate and not worth it to you for cance/rebook. If not set or set to 0.00, alerts trigger on any price drop as before.
+```yaml
+minimumSavingAlert: 2.00
+```
+
+
+## Get Cruise URL for Watchlist Functionality (Optional - This is only for a cruise you have not booked!)
+1. If you want to check the cabin price of a cruise you have booked, see above. This section is just for cruises you have *not* booked yet.
 1. Be sure you are logged out of the Royal Caribbean / Celebrity Website. If you are logged in, the URL you get in Step 5 will not work.
-1. Go to Royal Caribbean or Celebrity and do a mock booking of the room you have, with the same number of adults and kids
-1. Select a cruise and Select your room type/room and complete until they ask for your personal information.
+1. Go to Royal Caribbean or Celebrity and do a mock booking of the room you want, with the same number of adults and kids
+1. Select a cruise and select your room type/room and complete until they ask for your personal information.
 1. At this point, you should see a blue bar at the bottom right of webpage with a price
 1. Copy the entire URL from the top of your browser into the cruiseURL field. The url should start with `https://www.royalcaribbean.com/checkout/guest-info?...` or `https://www.celebritycruises.com/checkout/guest-info?...` where `...` is a bunch of stuff. Copy the entire URL
-1. Put the price you paid in the paidPrice field. Remove the `$` and any `,`
+1. Put the price you paid in the paidPrice field. Remove the `$` and any `,` . Subtract any OBC you recieved from Royal or your TA.
 1. Run the tool and see if it works
 1. You can add multiple cruiseURL/paidPrice to track multiple cruises or rooms on a cruise
-1. If the code says the price is cheaper, do a mock booking to see if cabin is still available. You need to do this from a new search on the Royal Caribbean / Celebrity website. Do not just put the cruiseURL in your browser. It is possible the room is not available. Going to the cruiseURL directly might give you a false alarm and you will look like an idiot calling your travel agent!
-1. If it is lower than you paid for, the cabin is still bookable, and before final payment date call your Travel Agent or Royal Caribbean (if you booked direct) and they will reduce the price. Be careful, you will lose the onboard credit you got in your first booking, if the new booking does not still offer it!
-1. Update the pricePaid field to the new price. Remove the `$` and any `,`
-1. Works easiest on a Guarantee Cabin, where multiple of same cabin exist for purchase. If checking a "You Pick the Room", be sure to check the price of the same class of room you booked (Connecting Balcony, Balcony class 4D or 4A , etc). If the room you picked is no longer available, you need to get a URL of another room in that class. If there are no more rooms of the same class available to book, you will not be able to reprice. You will need to manually check back on the Royal website to see if a room opened up. The API does not return cruise prices, so we are left with scraping the website.
-1. If you only want to check the cruise prices, you do not need to have your `accountInfo` and/or `apprise` in your config file, as they are not necessary.
+1. If the code says the price is cheaper, do a mock booking to see if cabin is still available. You need to do this from a new search on the Royal Caribbean / Celebrity website. Do not just put the cruiseURL in your browser.
+1. If it is lower than you paid for and before final payment date call your Travel Agent or Royal Caribbean (if you booked direct) and they should (reports of pushback lately) reduce the price. Be careful, you will lose the onboard credit you got in your first booking, if the new booking does not still offer it! The code will print the OBC offered for the new cruise, but will not subtract it because OBC only given in USD
+1. Update the pricePaid field to the new price. Remove the `$` ,`£` and any `,` (or `.` if non-USD currency for thousands designator)
+1. If there are no more rooms of the same class available to book, you will not be able to reprice. You will need to wait until a room opens up. The code will print the cheapest interior, outside view, balcony or suite available. These are probably GTY for each class and not the exact type of room you wanted. This is all the public cruise price API returns.
+1. If you only want to check the cruise prices with URL you provide, you do not need to have your `accountInfo` and/or `apprise` in your config file, as they are not necessary.
+1. The latest version checks availabily only for the class of room you have (not a specific room number). This new way is better.
+1. Should always find the current currency (except for OBC which is only in USD). If your currency is not supported, create an issue
    
-## Apprise (Optional)
+## Watch List for Beverage Packages/Excursions/etc (Optional)
+The watch list feature allows you to monitor specific cruise add-ons for price drops across all your bookings. When enabled, the system will check each passenger individually for the specified items and alert you if prices drop below your target price.
+
+### Configuration
+Add a `watchList` section to your `config.yaml` file:
+
+```yaml
+watchList: # Optional, items to monitor for price drops across all your bookings
+  - name: "Deluxe Beverage Package"
+    prefix: "pt_beverage"  # Category prefix
+    product: "3005"        # Product ID
+    price: 85.00           # Alert if current price drops below this amount. Use per night w/o gratutity price
+    enabled: true          # Set to false to temporarily disable this item
+    currency: "GBP"        # Optional currency code, defaults to "USD" if not set
+    guestAgeString: "child" # "infant", "child", "adult" are only options. Optional, defaults to "adult" if not set.
+    reservations: ['XXXXXXX', 'YYYYYYY'] # Optional. Check watchlist only for these reservation numbers. If not present, defaults to check all reservations   
+  - name: "Premium WiFi 2 Device Package"
+    prefix: "pt_internet"
+    product: "33F1"
+    price: 30.00
+    enabled: false         # This item will be skipped
+```
+
+### How It Works
+- **Per-Passenger Checking**: Each watchlist item is checked individually for every passenger in your bookings
+- **Individual Pricing**: Passengers may have different pricing based on loyalty status, age, or room category
+- **Output Format**: Results show as `[WATCH] Item Name - Passenger (Room): Message`
+- **Enabled Control**: Use the `enabled` field to temporarily disable specific watchlist items without removing them
+
+### Finding Product Information
+To find the `prefix` and `product` values for items you want to watch:
+1. Go to your Cruise Planner website and browse to the package you want to watch
+2. Inspect the URL to find the `prefix` and `product`, for example for the Premium WIFI 2 Device Package the URL looks like:
+   `https://www.celebritycruises.com/account/cruise-planner/category/pt_internet/product/33F1?bookingId=&shipCode=&sailDate=`
+3. The `prefix` is the path following /category/ (`pt_internet` in this case)
+4. The `product` is the value following /product/ (`33F1` in this case)
+5. Use the advertised price in the cruise panner. Eg. Doo not include gratituty. Use per day price for Beverage Package, UDP, Internet, Key.
+### Example Output
+```
+[WATCH] Deluxe Beverage Package - John (1234): Book! Deluxe Beverage Package Price is lower: 75.00 than 85.00
+[WATCH] Internet Package - Mary (1234): price is higher than watch price: 25.00 (now 30.00)
+```
+
+## Notification Emails/Pushbullet/etc via Apprise (Optional)
 1. Review documentation for apprise at: https://github.com/caronc/apprise
 1. 99% of people probably have gmail, so you can use the default already setup in the sample config.yaml
 1. This will send you an email only if there is a price drop
@@ -246,15 +318,14 @@ Thanks to contributors:
 - @tecmage (UDP, Coffee Card, Evian Water logic)  
 - @iareanthony (fixed "The Key")  
 - @jipis (internet pricing & passenger specials)  
-- @ProxesOnBoxes (date display options, config improvements)  
+- @ProxesOnBoxes (date display options, config improvements)
+- @jhedlund (Watchlist)
 - @RoyalCaribbeanBlog.com for featuring in an [article](https://www.royalcaribbeanblog.com/2025/04/19/cruise-price-trackers)
+- Frommers.com for featuring in an [article](https://www.frommers.com/tips/cruise/how-to-save-hundreds-on-royal-caribbeans-packages-and-excursions/)
+  
 # Issues
 1. Will not work if your password has an % in it. Change your password (replace % with ! for instance). Working on a fix. PRs welcome
-1. Only checks adult prices (> 12 years old), if only have child prices in an order it may not work. I don't have kids, so I can not fix. PRs welcome
-1. Handles orders made by other people in your party or linked cruises (even if you are not sailing on it)
-1. It should give you the price of the item in the same currency you bought it in. Post an issue if not working correctly.
-1. May not handle all orders correctly. Purchases of multiple coffee cards and Evian water should now work.
-1. Prices of internet, beverage packages, and "The Key" are per day, this code divides by the length of your cruise. If you buy a partial package, this logic may not work correctly. If any per-day item is not calculated correctly, post an issue.
+1. OBC will display in USD even if cruise being checked in a different currency. Not fixable as this is how OBC is provided
 1. Please double check that the price is lower before you rebook! I am not responsible if you book at a higher price!
 1. Double check you are cancelling the item for the correct cruise
 
