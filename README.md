@@ -1,7 +1,7 @@
 # CheckRoyalCaribbeanPrice
 Checks if you have the cheapest price for your **Royal Caribbean** and **Celebrity Cruises** purchases (beverage packages, excursions, internet, etc.).  
 - ✅ Automatically checks your purchased packages (no need to enter them manually)  
-- ✅ Alerts you if a lower price is available
+- ✅ Alerts you if a lower price is available (email, WhatsApp, ntfy, Home Assistant, etc) 
 - ✅ Finds deals specific to each passenger (loyalty or casino status, age-based or room specials) where other "royal price trackers" only find publicly available (often higher) prices
 - ✅ Shows currently assigned cabin in Royal's backend system (*likely* the room you will get if purchased a GTY "We choose your room")
 - ✅ Shows the payment balance Royal's backend system thinks they are owed (does not include TA's take!)
@@ -98,6 +98,10 @@ services:
 4. Run: `docker compose up -d`
 
 The Docker container will run the price checker on the schedule you have defined.
+
+## Install (Home Assistant Addon/App)
+See directions at: https://github.com/jdeath/homeassistant-addons/tree/main/royalpricecheck
+
 ## Edit Config File
 Create your `config.yaml` file with the below information. Feel free to copy the file `SAMPLE-config.yaml` to `config.yaml`. Edit `config.yaml` and place it in same directory as `CheckRoyalCaribbeanPrice.py` or `CheckRoyalCaribbeanPrice.exe` or when running `CheckRoyalCaribbeanPrice.py` provide the optional argument `-c path/to/config.yaml`.
 ```yaml
@@ -319,6 +323,7 @@ Thanks to contributors:
 - @iareanthony (fixed "The Key")  
 - @jipis (internet pricing & passenger specials)  
 - @ProxesOnBoxes (date display options, config improvements)
+- @JDare (Docker support and documentation, github workflow)
 - @jhedlund (Watchlist)
 - @RoyalCaribbeanBlog.com for featuring in an [article](https://www.royalcaribbeanblog.com/2025/04/19/cruise-price-trackers)
 - Frommers.com for featuring in an [article](https://www.frommers.com/tips/cruise/how-to-save-hundreds-on-royal-caribbeans-packages-and-excursions/)
