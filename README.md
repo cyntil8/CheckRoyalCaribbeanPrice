@@ -356,3 +356,31 @@ Command-line options may be used in any combination.  They are:
 
 There are no plans to add price checking/price history to this script. Use the `CheckRoyalCaribbeanPrice.py` script for that. If you really want to check public prices which may not be representative of the real deal you can get, just use `RoyalPriceTracker.com`.
 
+# Spreadsheet scripts
+There are four standalone python scripts to do various things and save the results to spreadsheets. Requires config.yaml as explained above for account login information and which cruises to track. Requires python library openpyxl to handle the spreadsheets. Requires python library babel for formatting money amounts in various currencies. Added to requirements.txt. There are two new options for config.yml, currency and locale. Currency is used for how to report prices and locale is used to format those prices the proper way. Uses babel to do that. Default is USD/en_US. Here are some examples of currencies/locales for the config file:
+
+#currency: 'USD'
+#locale: 'en_US'
+#currency: 'AUD'
+#locale: 'en_AU'
+#currency: 'JPY'
+#locale: "ja_JP"
+#currency: 'EUR'
+#locale: 'fr_FR'
+#locale: 'de_DE'
+#currency: 'GBP'
+#locale: 'en_GB'
+#currency: 'DKK'
+#locale: 'da_DK'
+
+## CheckCruisePrice.py
+This script is very similar to the original CheckRoyalCaribbeanPrice.py, except it stores the prices in a spreadsheet (price_history.xlsx) and creates a little graph. It does not report on orders or product prices, as that is in GetProducts.py
+
+## GetExcursions.py
+This script uses account information in config.yaml to login to the Royal Caribbean/Celebrity API and get all the excursions for the cruise. It writes them to a spreadsheet with the name R|C-[booking]-shorex.xlsx. Each row contains a link to view/book the excursion on the Royal Caribbean or Celebrity site. This script opens the exisiting spreadsheet and adds a new tab with the excursion prices each time you run it, so you have a history or excursion prices. If run with a booking parameter, it only builds a spreadsheet for that booking, otherwise, it finds all Royal Caribbean and Celebrity bookings for the account. Example: python GetExcursionList.py -b=123456
+
+## GetProducts.py
+This script uses account information in config.yaml to login to the Royal Caribbean/Celebrity API and get all of the products for the cruise. It then writes them to a spreadsheet with the name R|C-[booking]-products. It also prints the purchase and current prices of any products you have booked. This script opens the exisiting spreadsheet and adds a new tab with the product prices each time you run it, so you have a history or product prices. If run with a booking parameter, it only builds a spreadsheet for that booking, otherwise, it finds all Royal Caribbean and Celebrity bookings for the account. Example: python GetProducts.py -b=123456
+
+## ChartProductHistory.py
+This script uses only the spreadsheet created by GetProducts.py to create a chart of the prices of a specific item. It adds or updates a tab with the product requested. It requires two parameters, spreadsheet file name and product name. Example: python ChartProductHistory.py -f="R-123456-products.xlsx" -p="Deluxe Beverage Package"
