@@ -1,7 +1,7 @@
 # CheckRoyalCaribbeanPrice
 Checks if you have the cheapest price for your **Royal Caribbean** and **Celebrity Cruises** purchases (beverage packages, excursions, internet, etc.).  
 - ✅ Automatically checks your purchased packages (no need to enter them manually)  
-- ✅ Alerts you if a lower price is available (email, WhatsApp, ntfy, Home Assistant, etc) 
+- ✅ Alerts you if a lower price is available (email, ntfy, Home Assistant, etc) 
 - ✅ Finds deals specific to each passenger (loyalty or casino status, age-based or room specials) where other "royal price trackers" only find publicly available (often higher) prices
 - ✅ Shows currently assigned cabin in Royal's backend system (*likely* the room you will get if purchased a GTY "We choose your room")
 - ✅ Shows the payment balance Royal's backend system thinks they are owed (does not include TA's take!)
@@ -121,7 +121,7 @@ cruises: # Optional, this allows you to watch the price of a cruise you have not
 apprise_test: false # Optional
 apprise:  # Optional, see https://github.com/caronc/apprise, can have as many lines as you want.
   - url: "mailto://user:password@gmail.com"
-  - url: "whatsapp://AccessToken@FromPhoneID/ToPhoneNo"
+  - url: "ntfy://abcfeg3839439djd"
 ```
 
 If you only want to check cruise addons (drink packages, excursions, etc) and do not want emails or check cruise prices, the config file is simpler. Start with this to see if works. You can have any number of Royal and/or Celebrity accounts:
@@ -325,6 +325,8 @@ Thanks to contributors:
 - @ProxesOnBoxes (date display options, config improvements)
 - @JDare (Docker support and documentation, github workflow)
 - @jhedlund (Watchlist)
+- @chblan (fix for iPhone script)
+- @AESternberg (Formatting and updates to below Browse script)
 - @RoyalCaribbeanBlog.com for featuring in an [article](https://www.royalcaribbeanblog.com/2025/04/19/cruise-price-trackers)
 - Frommers.com for featuring in an [article](https://www.frommers.com/tips/cruise/how-to-save-hundreds-on-royal-caribbeans-packages-and-excursions/)
   
@@ -335,21 +337,22 @@ Thanks to contributors:
 1. Double check you are cancelling the item for the correct cruise
 
 # Browse RoyalCaribbean Prices
-This is a new script that will browse any Royal Caribbean or Celebrity sailing and show current public prices for excursions/drink packages/etc. If you book the cruise, the price could be lower than shown due to C&A or casino specials. You simply run the script `python BrowseRoyalCaribbeanPrice.py` or `BrowseRoyalCaribbeanPrice.exe`. It will prompt you to select the ship and sailing. It will provide a link to the Royal Caribbean website which has the product prices for that cruise (be sure to be logged out of the RC website or link will not work). Code will also print all the prices. This does not require a Royal Caribbean or Celebrity account and can be used by anyone. Inspired by and similar functionality to `https://cruisespotlight.com/royal-caribbean-cruise-planner-price-lookup/`. Defaults to USD currency. If you want a different currency, for example DKK, run `python BrowseRoyalCaribbeanPrice.py -c DKK` or  `BrowseRoyalCaribbeanPrice.exe -c DKK`
+This is a new script that will browse any Royal Caribbean or Celebrity sailing and show current public prices for excursions/drink packages/etc. If you book the cruise, the price could be lower than shown due to C&A or casino specials.  It will provide a link to the Royal Caribbean website which has the product prices for that cruise (be sure to be logged out of the RC website or link will not work). Code will also print all the prices. This does not require a Royal Caribbean or Celebrity account and can be used by anyone. Inspired by and similar functionality to `https://cruisespotlight.com/royal-caribbean-cruise-planner-price-lookup/`. 
+
+You simply run the script. It will prompt you to select the ship and sailing from a menu.
+- `python BrowseRoyalCaribbeanPrice.py` or `BrowseRoyalCaribbeanPrice.exe`. 
+
+Defaults to USD currency. If you want a different currency, for example DKK:
+- `python BrowseRoyalCaribbeanPrice.py -c DKK` or  `BrowseRoyalCaribbeanPrice.exe -c DKK`
+
+If you are looking for a specific ship or sail date, you may also specify them on the command line as well.  Some examples are: 
+- `python BrowseRoyalCaribbeanPrice.py -s Wonder` or `BrowseRoyalCaribbeanPrice.exe -s Wonder`
+- `python BrowseRoyalCaribbeanPrice.py -d 05/10/27` or `BrowseRoyalCaribbeanPrice.exe -d 05/10/27`
+
+Command-line options may be used in any combination.  They are:
+- -c, --currency: currency (default: USD)
+- -s, --ship: The ship to browse for; do not include 'of the Seas' after the ship name (Royal Caribbean) or 'Celebrity' before it (Celebrity)
+- -d, --saildate: Date of the sailing to browse for (date format is mm/dd/yy)
 
 There are no plans to add price checking/price history to this script. Use the `CheckRoyalCaribbeanPrice.py` script for that. If you really want to check public prices which may not be representative of the real deal you can get, just use `RoyalPriceTracker.com`.
 
-# Spreadsheet scripts
-There are four standalone python scripts to do various things and save the results to spreadsheets. Requires config.yaml as explained above for account login information and which cruises to track. Requires python library openpyxl to handle the spreadsheets. Added to requirements.txt.
-
-## CheckCruisePrice.py
-This script is very similar to CheckRoyalCaribbeanPrice.py, except it stores the prices in a spreadsheet (price_history.xlsx) and creates a little graph. It does not report on orders or product prices, as that is in GetProducts.py
-
-## GetExcursions.py
-This script uses account information in config.yaml to login to the Royal Caribbean/Celebrity API and get all the excursions for the cruise. It writes them to a spreadsheet with the name R|C-[booking]-shorex.xlsx. Each row contains a link to view/book the excursion on the Royal Caribbean or Celebrity site. This script writes the spreadsheet each day, so there is no history of excursion prices. If run with a booking parameter, it only builds a spreadsheet for that booking, otherwise, it finds all Royal Caribbean and Celebrity bookings for the account. Example: python GetExcursionList.py -b=123456
-
-## GetProducts.py
-This script uses account information in config.yaml to login to the Royal Caribbean/Celebrity API and get all of the products for the cruise. It then writes them to a spreadsheet with the name R|C-[booking]-products. It also prints the purchase and current prices of any products you have booked. This script opens the exisiting spreadsheet and adds a new tab with the product prices each time you run it, so you have a history or product prices. If run with a booking parameter, it only builds a spreadsheet for that booking, otherwise, it finds all Royal Caribbean and Celebrity bookings for the account. Example: python GetProducts.py -b=123456
-
-## ChartProductHistory.py
-This script uses only the spreadsheet created by GetProducts.py to create a chart of the prices of a specific item. It adds or updates a tab with the product requested. It requires two parameters, spreadsheet file name and product name. Example: python ChartProductHistory.py -f="R-123456-products.xlsx" -p="Deluxe Beverage Package"
