@@ -323,12 +323,7 @@ def getOrders(access_token,accountId,session,reservationId,passengerId,ship,star
                 if orderDetail.get("guests")[0].get("orderStatus") == "CANCELLED":
                     continue
                 order_title = orderDetail.get("productSummary").get("title")
-                product = orderDetail.get("productSummary").get("id")
-                altProduct = None
-                if orderDetail.get("productSummary").get("baseId") and orderDetail.get("productSummary").get("baseId") != product:
-                    altProduct = orderDetail.get("productSummary").get("baseId")
-                if orderDetail.get("id") and orderDetail.get("id") != altProduct:
-                    altProduct = orderDetail.get("id")
+                product = orderDetail.get("productSummary").get("baseOptions")[0].get("selected").get("code")
                 prefix = orderDetail.get("productSummary").get("productTypeCategory").get("id")
                 paidCurrency = orderDetail.get("guests")[0].get("priceDetails").get("currency")
                 paidLocale = localeCode
@@ -338,9 +333,9 @@ def getOrders(access_token,accountId,session,reservationId,passengerId,ship,star
                 # These packages report total price, must divide by number of days
                 if orderDetail.get("productSummary").get("salesUnit") in [ 'PER_NIGHT', 'PER_DAY' ]:
                    paidPrice = round(paidPrice / numberOfNights,2)
-                getCurrentPrice(access_token,accountId,session,reservationId,passengerId,ship,startDate,prefix,paidPrice,paidCurrency,paidLocale,product,altProduct,cruiseLineCode)
+                getCurrentPrice(access_token,accountId,session,reservationId,passengerId,ship,startDate,prefix,paidPrice,paidCurrency,paidLocale,product,cruiseLineCode)
 
-def getCurrentPrice(access_token,accountId,session,reservationId,passengerId,ship,startDate,prefix,paidPrice,paidCurrency,paidLocale,product,altProduct,cruiseLineCode):    
+def getCurrentPrice(access_token,accountId,session,reservationId,passengerId,ship,startDate,prefix,paidPrice,paidCurrency,paidLocale,product,cruiseLineCode):    
     
     headers = {
         'Access-Token': access_token,
@@ -384,10 +379,7 @@ def getCurrentPrice(access_token,accountId,session,reservationId,passengerId,shi
         else:
             text += " - unchanged"
     else:
-        if altProduct is not None:
-            getCurrentPrice(access_token,accountId,session,reservationId,passengerId,ship,startDate,prefix,paidPrice,paidCurrency,paidLocale,altProduct,None,cruiseLineCode)
-            return
-        text += title + " - Paid price: " + format_money(paidPrice, paidCurrency, paidLocale) + " Current price not available. Product code: " + product + f" Alt product: {altProduct}" if altProduct else ""
+        text += title + " - Paid price: " + format_money(paidPrice, paidCurrency, paidLocale) + " Current price not available. Product code: " + product
 
     print(text)
 
